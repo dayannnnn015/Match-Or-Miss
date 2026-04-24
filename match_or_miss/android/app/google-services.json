@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "269061882766",
+    "project_id": "match-or-miss-game",
+    "storage_bucket": "match-or-miss-game.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269061882766:android:709e496ab6a357e59cdadf",
+        "android_client_info": {
+          "package_name": "com.game.match_or_miss"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXilVHWB4MtcWYUTY0fSX2HEvHukg-vnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
