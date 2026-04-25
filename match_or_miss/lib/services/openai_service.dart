@@ -6,7 +6,7 @@ import '../models/game_models.dart';
 
 enum AIProvider {
   openAI,
-  anthropic,    // Claude
+  anthropic, // Claude
   googleGemini,
   customAPI,
 }
@@ -14,17 +14,26 @@ enum AIProvider {
 class OpenAIService {
   String? _apiKey;
   AIProvider _currentProvider = AIProvider.openAI;
+
   final Map<AIProvider, String> _apiEndpoints = {
     AIProvider.openAI: 'https://api.openai.com/v1/chat/completions',
     AIProvider.anthropic: 'https://api.anthropic.com/v1/messages',
-    AIProvider.googleGemini: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+    AIProvider.googleGemini:
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
   };
-  
+
+  // Timeout prevents the submit button from hanging forever
+  static const Duration _timeout = Duration(seconds: 15);
+
   void setApiKey(String key, {AIProvider provider = AIProvider.openAI}) {
-    _apiKey = key;
+    _apiKey = key.trim();
     _currentProvider = provider;
   }
-  
+
+  bool get hasValidKey => _apiKey != null && _apiKey!.isNotEmpty;
+
+  // ─── Public API ────────────────────────────────────────────────────────────
+
   Future<String> getAIHint({
     required List<Attempt> attempts,
     required int currentMatches,
@@ -32,25 +41,14 @@ class OpenAIService {
     required int timeRemaining,
     String? playerId,
   }) async {
-    if (_apiKey == null || _apiKey!.isEmpty) {
+    if (!hasValidKey) {
       return _getFallbackHint(attempts, currentMatches);
     }
-    
     try {
-      final prompt = _buildPrompt(attempts, currentMatches, movesLeft, timeRemaining, playerId);
-      
-      switch (_currentProvider) {
-        case AIProvider.openAI:
-          return await _callOpenAI(prompt);
-        case AIProvider.anthropic:
-          return await _callAnthropic(prompt);
-        case AIProvider.googleGemini:
-          return await _callGemini(prompt);
-        case AIProvider.customAPI:
-          return await _callCustomAPI(prompt);
-      }
+      final prompt = _buildHintPrompt(attempts, currentMatches, movesLeft, timeRemaining, playerId);
+      return await _dispatch(prompt);
     } catch (e) {
-      print('AI API Error: $e');
+      print('AI hint error: $e');
       return _getFallbackHint(attempts, currentMatches);
     }
   }
@@ -61,120 +59,76 @@ class OpenAIService {
     required int moves,
     required int timeSpent,
   }) async {
-    if (_apiKey == null || _apiKey!.isEmpty) {
-      return 'Great job completing the puzzle! Keep practicing to improve your score.';
+    if (!hasValidKey) {
+      return _buildLocalFeedback(attempts, score, moves, timeSpent);
     }
-    
     try {
       final prompt = _buildCompletionPrompt(attempts, score, moves, timeSpent);
-      
-      switch (_currentProvider) {
-        case AIProvider.openAI:
-          return await _callOpenAI(prompt);
-        case AIProvider.anthropic:
-          return await _callAnthropic(prompt);
-        case AIProvider.googleGemini:
-          return await _callGemini(prompt);
-        case AIProvider.customAPI:
-          return await _callCustomAPI(prompt);
-      }
+      final result = await _dispatch(prompt);
+      return result.isEmpty ? _buildLocalFeedback(attempts, score, moves, timeSpent) : result;
     } catch (e) {
-      print('Game Feedback API Error: $e');
-      return 'Congratulations on completing the puzzle! Practice more games to develop better strategies.';
+      print('Game feedback error: $e');
+      return _buildLocalFeedback(attempts, score, moves, timeSpent);
     }
   }
-  
-  String _buildCompletionPrompt(
-    List<Attempt> attempts,
-    int score,
-    int moves,
-    int timeSpent,
-  ) {
-    return '''You are a cognitive training AI providing personalized feedback for the game "Match or Miss".
 
-The player just completed a puzzle with these results:
-- Score: $score
-- Moves used: $moves out of 12 allowed
-- Time spent: ${timeSpent ~/ 60} minutes ${timeSpent % 60} seconds
-- Total attempts: ${attempts.length}
+  Future<AIPlayerAnalysis> getDeepAnalysis(List<Attempt> attempts) async {
+    if (!hasValidKey || attempts.isEmpty) {
+      return _getBasicAnalysis(attempts);
+    }
+    try {
+      final analysisPrompt = '''
+Analyze this player in a cognitive puzzle game.
 
-Move History:
 ${_formatAttemptHistory(attempts)}
 
-Provide encouraging, specific feedback on their performance. Focus on:
-1. What they did well (strategy, decision-making, efficiency)
-2. One area to improve
-3. A tip for the next game
-
-Keep it concise (3-4 sentences), positive, and actionable.''';
-  }
-  
-  String _buildPrompt(
-    List<Attempt> attempts,
-    int currentMatches,
-    int movesLeft,
-    int timeRemaining,
-    String? playerId,
-  ) {
-    return '''
-You are an expert cognitive training AI for the game "Match or Miss" - a puzzle game training executive functions.
-
-GAME CONTEXT:
-- Player must decode a hidden sequence of 8 colored bottles
-- Only told how many are correct (matches), not which positions
-- Has $movesLeft moves remaining
-- Has $timeRemaining seconds remaining
-- Current matches: $currentMatches/8
-
-ATTEMPT HISTORY:
-${_formatAttemptHistory(attempts)}
-
-PLAYER STATISTICS:
-- Total attempts: ${attempts.length}
-- Average variables changed per move: ${_calculateAvgChanges(attempts)}
-- Progress rate: ${_calculateProgressRate(attempts)}
-- Impulsive moves detected: ${_countImpulsiveMoves(attempts)}
-
-Based on this data, provide a short, actionable hint (max 100 characters) that:
-1. Encourages systematic thinking
-2. Addresses specific mistakes in their strategy
-3. Suggests a concrete next action
-4. Uses positive, motivating language
-
-Be specific and tactical. Don't just say "keep trying" - give actual strategy advice.
-
-HINT:''';
-  }
-  
-  String _formatAttemptHistory(List<Attempt> attempts) {
-    if (attempts.isEmpty) return "No attempts yet.";
-    
-    StringBuffer history = StringBuffer();
-    for (int i = max(0, attempts.length - 5); i < attempts.length; i++) {
-      final a = attempts[i];
-      history.writeln(
-        "Move ${a.attemptNumber}: ${a.matches}/8 matches, "
-        "changed ${a.variablesChanged} bottles, "
-        "${a.wasImpulsive ? 'IMPULSIVE' : 'methodical'}"
+Respond ONLY with valid JSON (no markdown, no explanation):
+{
+  "strengths": ["strength1", "strength2"],
+  "weaknesses": ["weakness1", "weakness2"],
+  "cognitiveProfile": "brief description",
+  "suggestions": ["tip1", "tip2", "tip3"],
+  "estimatedSkillLevel": 5,
+  "efficiencyScore": 60
+}
+''';
+      final response = await _dispatch(analysisPrompt);
+      final start = response.indexOf('{');
+      final end = response.lastIndexOf('}');
+      if (start == -1 || end == -1) return _getBasicAnalysis(attempts);
+      final data = jsonDecode(response.substring(start, end + 1));
+      return AIPlayerAnalysis(
+        avgVariablesChanged: _calculateAvgChanges(attempts),
+        impulsiveMoves: _countImpulsiveMoves(attempts),
+        repeatedMistakes: _countRepeatedMistakes(attempts),
+        progressRate: _calculateProgressRate(attempts),
+        suggestions: List<String>.from(data['suggestions'] ?? []),
+        moveEfficiencies: _calculateMoveEfficiencies(attempts),
+        strengths: List<String>.from(data['strengths'] ?? []),
+        weaknesses: List<String>.from(data['weaknesses'] ?? []),
+        cognitiveProfile: data['cognitiveProfile'] ?? '',
+        estimatedSkillLevel: (data['estimatedSkillLevel'] as num?)?.toInt() ?? 5,
+        efficiencyScore: (data['efficiencyScore'] as num?)?.toDouble() ?? 50.0,
       );
+    } catch (e) {
+      print('Deep analysis error: $e');
+      return _getBasicAnalysis(attempts);
     }
-    return history.toString();
   }
-  
-  double _calculateAvgChanges(List<Attempt> attempts) {
-    if (attempts.isEmpty) return 0;
-    return attempts.map((a) => a.variablesChanged.toDouble()).reduce((a, b) => a + b) / attempts.length;
+
+  // ─── Router ────────────────────────────────────────────────────────────────
+
+  Future<String> _dispatch(String prompt) {
+    switch (_currentProvider) {
+      case AIProvider.openAI:      return _callOpenAI(prompt);
+      case AIProvider.anthropic:   return _callAnthropic(prompt);
+      case AIProvider.googleGemini: return _callGemini(prompt);
+      case AIProvider.customAPI:   return _callCustomAPI(prompt);
+    }
   }
-  
-  double _calculateProgressRate(List<Attempt> attempts) {
-    if (attempts.length < 2) return 0;
-    return (attempts.last.matches - attempts.first.matches) / attempts.length;
-  }
-  
-  int _countImpulsiveMoves(List<Attempt> attempts) {
-    return attempts.where((a) => a.wasImpulsive).length;
-  }
-  
+
+  // ─── Provider calls ────────────────────────────────────────────────────────
+
   Future<String> _callOpenAI(String prompt) async {
     final response = await http.post(
       Uri.parse(_apiEndpoints[AIProvider.openAI]!),
@@ -183,30 +137,26 @@ HINT:''';
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'gpt-4-turbo-preview', // or 'gpt-3.5-turbo' for lower cost
+        'model': 'gpt-4o-mini',
         'messages': [
           {
             'role': 'system',
-            'content': 'You are a cognitive training expert. Provide concise, actionable hints for a puzzle game.',
+            'content': 'You are a cognitive training expert. Provide concise, actionable feedback for a puzzle game.',
           },
-          {
-            'role': 'user',
-            'content': prompt,
-          }
+          {'role': 'user', 'content': prompt},
         ],
-        'max_tokens': 150,
+        'max_tokens': 200,
         'temperature': 0.7,
       }),
-    );
-    
+    ).timeout(_timeout);
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['choices'][0]['message']['content'].trim();
-    } else {
-      throw Exception('OpenAI API error: ${response.statusCode}');
+      return (data['choices'][0]['message']['content'] as String).trim();
     }
+    throw Exception('OpenAI error ${response.statusCode}: ${response.body}');
   }
-  
+
   Future<String> _callAnthropic(String prompt) async {
     final response = await http.post(
       Uri.parse(_apiEndpoints[AIProvider.anthropic]!),
@@ -216,25 +166,21 @@ HINT:''';
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'claude-3-opus-20240229',
-        'max_tokens': 150,
+        'model': 'claude-haiku-4-5-20251001', // fast & affordable
+        'max_tokens': 200,
         'messages': [
-          {
-            'role': 'user',
-            'content': prompt,
-          }
+          {'role': 'user', 'content': prompt},
         ],
       }),
-    );
-    
+    ).timeout(_timeout);
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['content'][0]['text'].trim();
-    } else {
-      throw Exception('Anthropic API error: ${response.statusCode}');
+      return (data['content'][0]['text'] as String).trim();
     }
+    throw Exception('Anthropic error ${response.statusCode}: ${response.body}');
   }
-  
+
   Future<String> _callGemini(String prompt) async {
     final response = await http.post(
       Uri.parse('${_apiEndpoints[AIProvider.googleGemini]!}?key=$_apiKey'),
@@ -248,136 +194,151 @@ HINT:''';
           }
         ],
         'generationConfig': {
-          'maxOutputTokens': 150,
+          'maxOutputTokens': 200,
           'temperature': 0.7,
-        }
+        },
       }),
-    );
-    
+    ).timeout(_timeout);
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['candidates'][0]['content']['parts'][0]['text'].trim();
-    } else {
-      throw Exception('Gemini API error: ${response.statusCode}');
+      return (data['candidates'][0]['content']['parts'][0]['text'] as String).trim();
     }
+    throw Exception('Gemini error ${response.statusCode}: ${response.body}');
   }
-  
+
   Future<String> _callCustomAPI(String prompt) async {
-    // For custom backend API
     final response = await http.post(
       Uri.parse('https://your-backend.com/api/ai-hint'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'prompt': prompt,
-        'apiKey': _apiKey,
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['hint'];
-    } else {
-      throw Exception('Custom API error: ${response.statusCode}');
-    }
-  }
-  
-  String _getFallbackHint(List<Attempt> attempts, int currentMatches) {
-    if (attempts.isEmpty) {
-      return "🎮 Start with all bottles the same color to find how many match!";
-    }
-    
-    final lastAttempt = attempts.last;
-    
-    if (lastAttempt.variablesChanged > 3) {
-      return "🎯 You changed ${lastAttempt.variablesChanged} bottles. Try changing just 1-2 at a time!";
-    }
-    
-    if (currentMatches == 0 && attempts.length > 2) {
-      return "💡 No matches yet. Try a completely different color pattern.";
-    }
-    
-    if (currentMatches > 0 && currentMatches < 4) {
-      return "👍 Keep your $currentMatches matches and change the other bottles systematically.";
-    }
-    
-    return "🧠 Methodical changes lead to solutions. What's your hypothesis for this move?";
-  }
-  
-  Future<AIPlayerAnalysis> getDeepAnalysis(List<Attempt> attempts) async {
-    if (_apiKey == null || attempts.isEmpty) {
-      return _getBasicAnalysis(attempts);
-    }
-    
-    try {
-      final analysisPrompt = '''
-Analyze this player's performance in a cognitive puzzle game:
+      body: jsonEncode({'prompt': prompt, 'apiKey': _apiKey}),
+    ).timeout(_timeout);
 
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body)['hint'] as String;
+    }
+    throw Exception('Custom API error ${response.statusCode}');
+  }
+
+  // ─── Prompt builders ───────────────────────────────────────────────────────
+
+  String _buildCompletionPrompt(List<Attempt> attempts, int score, int moves, int timeSpent) {
+    return '''You are a cognitive training AI for "Match or Miss" — a puzzle where the player decodes a hidden 8-bottle color sequence.
+
+Results:
+- Score: $score
+- Moves used: $moves
+- Time: ${timeSpent ~/ 60}m ${timeSpent % 60}s
+
+Move history:
 ${_formatAttemptHistory(attempts)}
 
-Provide analysis in JSON format:
-{
-  "strengths": ["strength1", "strength2"],
-  "weaknesses": ["weakness1", "weakness2"],
-  "cognitiveProfile": "description of cognitive style",
-  "suggestions": ["suggestion1", "suggestion2", "suggestion3"],
-  "estimatedSkillLevel": 1-10,
-  "efficiencyScore": 0-100
-}
-''';
-      
-      final response = await _callOpenAI(analysisPrompt);
-      // Parse JSON response
-      final jsonStr = response.substring(response.indexOf('{'), response.lastIndexOf('}') + 1);
-      final data = jsonDecode(jsonStr);
-      
-      return AIPlayerAnalysis(
-        avgVariablesChanged: _calculateAvgChanges(attempts),
-        impulsiveMoves: _countImpulsiveMoves(attempts),
-        repeatedMistakes: _countRepeatedMistakes(attempts),
-        progressRate: _calculateProgressRate(attempts),
-        suggestions: List<String>.from(data['suggestions']),
-        moveEfficiencies: _calculateMoveEfficiencies(attempts),
-        strengths: List<String>.from(data['strengths']),
-        weaknesses: List<String>.from(data['weaknesses']),
-        cognitiveProfile: data['cognitiveProfile'],
-        estimatedSkillLevel: data['estimatedSkillLevel'],
-        efficiencyScore: data['efficiencyScore'],
-      );
-    } catch (e) {
-      print('Deep analysis error: $e');
-      return _getBasicAnalysis(attempts);
-    }
+Give encouraging feedback in 3-4 sentences: what they did well, one area to improve, and a practical tip. Write as flowing sentences, no bullet points.''';
   }
-  
+
+  String _buildHintPrompt(List<Attempt> attempts, int currentMatches, int movesLeft, int timeRemaining, String? playerId) {
+    return '''
+You are a cognitive training AI for "Match or Miss" (8-bottle color sequence puzzle, each color used exactly once).
+
+State: $movesLeft moves left, $timeRemaining seconds, $currentMatches/8 matches.
+
+Recent moves:
+${_formatAttemptHistory(attempts)}
+
+Avg bottles changed: ${_calculateAvgChanges(attempts).toStringAsFixed(1)}, impulsive moves: ${_countImpulsiveMoves(attempts)}.
+
+Write ONE tactical hint, max 100 characters. Be specific, not generic.
+
+HINT:''';
+  }
+
+  // ─── Analytics helpers ─────────────────────────────────────────────────────
+
+  String _formatAttemptHistory(List<Attempt> attempts) {
+    if (attempts.isEmpty) return 'No attempts yet.';
+    final buf = StringBuffer();
+    for (int i = max(0, attempts.length - 5); i < attempts.length; i++) {
+      final a = attempts[i];
+      buf.writeln(
+          'Move ${a.attemptNumber}: ${a.matches}/8 matches, '
+          'changed ${a.variablesChanged} bottles, '
+          '${a.wasImpulsive ? 'IMPULSIVE' : 'methodical'}');
+    }
+    return buf.toString();
+  }
+
+  double _calculateAvgChanges(List<Attempt> attempts) {
+    if (attempts.isEmpty) return 0;
+    return attempts.map((a) => a.variablesChanged.toDouble()).reduce((a, b) => a + b) /
+        attempts.length;
+  }
+
+  double _calculateProgressRate(List<Attempt> attempts) {
+    if (attempts.length < 2) return 0;
+    return (attempts.last.matches - attempts.first.matches) / attempts.length;
+  }
+
+  int _countImpulsiveMoves(List<Attempt> attempts) => attempts.where((a) => a.wasImpulsive).length;
+
   int _countRepeatedMistakes(List<Attempt> attempts) {
     int repeats = 0;
     for (int i = 1; i < attempts.length; i++) {
-      if (attempts[i].matches == attempts[i-1].matches && 
-          attempts[i].guess != attempts[i-1].guess) {
+      if (attempts[i].matches == attempts[i - 1].matches &&
+          attempts[i].guess != attempts[i - 1].guess) {
         repeats++;
       }
     }
     return repeats;
   }
-  
+
   List<MoveEfficiency> _calculateMoveEfficiencies(List<Attempt> attempts) {
-    List<MoveEfficiency> efficiencies = [];
-    for (int i = 0; i < attempts.length; i++) {
-      double efficiency = i == 0 
-          ? attempts[i].matches / 8.0 
-          : (attempts[i].matches - attempts[i-1].matches) / 8.0;
-      
-      efficiencies.add(MoveEfficiency(
+    return List.generate(attempts.length, (i) {
+      final eff = i == 0
+          ? attempts[i].matches / 8.0
+          : (attempts[i].matches - attempts[i - 1].matches) / 8.0;
+      return MoveEfficiency(
         moveNumber: i + 1,
-        efficiency: efficiency,
-        feedback: efficiency > 0 
-            ? "Improved by ${(efficiency * 8).round()} match(es)" 
-            : "No improvement",
-      ));
-    }
-    return efficiencies;
+        efficiency: eff,
+        feedback: eff > 0 ? 'Improved by ${(eff * 8).round()} match(es)' : 'No improvement',
+      );
+    });
   }
-  
+
+  double _calculateEfficiencyScore(List<Attempt> attempts) {
+    if (attempts.isEmpty) return 0;
+    return (_calculateProgressRate(attempts) * 100) - (_calculateAvgChanges(attempts) * 5);
+  }
+
+  // ─── Local fallbacks ───────────────────────────────────────────────────────
+
+  String _getFallbackHint(List<Attempt> attempts, int currentMatches) {
+    if (attempts.isEmpty) return '🎮 Each color is used exactly once. Try locking in colors you know.';
+    final last = attempts.last;
+    if (last.variablesChanged > 3)
+      return '🎯 You changed ${last.variablesChanged} bottles. Try 1–2 at a time for cleaner data.';
+    if (currentMatches == 0 && attempts.length > 2)
+      return '💡 Zero matches — every color is wrong. Rotate all bottles to a fresh pattern.';
+    if (currentMatches > 0 && currentMatches < 4)
+      return '👍 Keep your $currentMatches matches fixed and swap the remaining ones.';
+    return '🧠 Systematic swaps reveal the answer. What\'s your hypothesis?';
+  }
+
+  String _buildLocalFeedback(List<Attempt> attempts, int score, int moves, int timeSpent) {
+    if (attempts.isEmpty) return 'Complete a game to see your analysis!';
+    final best = attempts.reduce((a, b) => a.matches > b.matches ? a : b);
+    final avgChanged = attempts.map((a) => a.variablesChanged).reduce((a, b) => a + b) / attempts.length;
+    final impulsive = attempts.where((a) => a.wasImpulsive).length;
+    final buf = StringBuffer();
+    buf.write('Your best move was move ${best.attemptNumber} with ${best.matches}/8 matches. ');
+    buf.write(impulsive == 0
+        ? 'Great discipline — no impulsive moves detected! '
+        : '$impulsive impulsive move(s) detected; slowing down helps isolate variables. ');
+    buf.write(avgChanged > 2.5
+        ? 'Try swapping only 1–2 bottles per move for cleaner feedback each round.'
+        : 'Your methodical approach is working — keep isolating one variable at a time.');
+    return buf.toString();
+  }
+
   AIPlayerAnalysis _getBasicAnalysis(List<Attempt> attempts) {
     return AIPlayerAnalysis(
       avgVariablesChanged: _calculateAvgChanges(attempts),
@@ -385,23 +346,16 @@ Provide analysis in JSON format:
       repeatedMistakes: _countRepeatedMistakes(attempts),
       progressRate: _calculateProgressRate(attempts),
       suggestions: [
-        "Try changing only 1-2 bottles per move",
-        "Keep successful matches in place",
-        "Use a systematic testing strategy",
+        'Try changing only 1–2 bottles per move',
+        'Keep successful matches in place',
+        'Use a systematic testing strategy',
       ],
       moveEfficiencies: _calculateMoveEfficiencies(attempts),
       strengths: [],
       weaknesses: [],
-      cognitiveProfile: "Analyzing...",
+      cognitiveProfile: 'Analyzing...',
       estimatedSkillLevel: 5,
       efficiencyScore: _calculateEfficiencyScore(attempts),
     );
-  }
-  
-  double _calculateEfficiencyScore(List<Attempt> attempts) {
-    if (attempts.isEmpty) return 0;
-    final progressRate = _calculateProgressRate(attempts);
-    final avgChanges = _calculateAvgChanges(attempts);
-    return (progressRate * 100) - (avgChanges * 5);
   }
 }

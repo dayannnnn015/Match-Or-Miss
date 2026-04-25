@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/ai_provider.dart';
+import '../providers/game_provider.dart';
+import '../services/openai_service.dart' as ai_svc;
 
 class APIKeyDialog extends StatefulWidget {
   const APIKeyDialog({super.key});
@@ -12,10 +14,9 @@ class APIKeyDialog extends StatefulWidget {
 
 class _APIKeyDialogState extends State<APIKeyDialog> {
   String _apiKey = '';
-  AIProviderType _selectedProvider = AIProviderType.openAI;
-  bool _saveKey = false;
+  AIProviderType _selectedProvider = AIProviderType.anthropic; // default to Claude
   bool _showKey = false;
-  
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -32,12 +33,14 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
                 SizedBox(width: 10),
                 Text(
                   'Connect AI Assistant',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Unlock real AI insights after each game.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 20),
             const Text('Choose AI Provider:'),
@@ -50,7 +53,7 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
               obscureText: !_showKey,
               onChanged: (value) => _apiKey = value,
               decoration: InputDecoration(
-                hintText: 'Enter your API key',
+                hintText: 'Paste your API key here',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: Icon(_showKey ? Icons.visibility_off : Icons.visibility),
@@ -58,20 +61,10 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               _getProviderHint(),
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Checkbox(
-                  value: _saveKey,
-                  onChanged: (value) => setState(() => _saveKey = value ?? false),
-                ),
-                const Text('Save API key securely'),
-              ],
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
             const SizedBox(height: 20),
             Row(
@@ -83,12 +76,8 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                  onPressed: _apiKey.isNotEmpty
-                      ? () => _connectAI(context)
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                  ),
+                  onPressed: _apiKey.trim().isNotEmpty ? () => _connectAI(context) : null,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   child: const Text('Connect'),
                 ),
               ],
@@ -98,7 +87,7 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
       ),
     );
   }
-  
+
   Widget _buildProviderSelector() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -109,17 +98,17 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildProviderOption(AIProviderType.openAI, 'OpenAI', Icons.auto_awesome),
           _buildProviderOption(AIProviderType.anthropic, 'Claude', Icons.psychology),
+          _buildProviderOption(AIProviderType.openAI, 'OpenAI', Icons.auto_awesome),
           _buildProviderOption(AIProviderType.googleGemini, 'Gemini', Icons.android),
           _buildProviderOption(AIProviderType.customAPI, 'Custom', Icons.api),
         ],
       ),
     );
   }
-  
+
   Widget _buildProviderOption(AIProviderType provider, String label, IconData icon) {
-    bool isSelected = _selectedProvider == provider;
+    final isSelected = _selectedProvider == provider;
     return GestureDetector(
       onTap: () => setState(() => _selectedProvider = provider),
       child: Container(
@@ -133,40 +122,57 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
           children: [
             Icon(icon, color: isSelected ? Colors.cyan : Colors.grey),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(
-              color: isSelected ? Colors.cyan : Colors.grey,
-              fontSize: 12,
-            )),
+            Text(label,
+                style: TextStyle(
+                    color: isSelected ? Colors.cyan : Colors.grey, fontSize: 12)),
           ],
         ),
       ),
     );
   }
-  
+
   String _getProviderHint() {
     switch (_selectedProvider) {
-      case AIProviderType.openAI:
-        return 'Get API key from: platform.openai.com/api-keys';
       case AIProviderType.anthropic:
-        return 'Get API key from: console.anthropic.com';
+        return 'Get your key at: console.anthropic.com';
+      case AIProviderType.openAI:
+        return 'Get your key at: platform.openai.com/api-keys';
       case AIProviderType.googleGemini:
-        return 'Get API key from: makersuite.google.com/app/apikey';
+        return 'Get your key at: aistudio.google.com/app/apikey';
       case AIProviderType.customAPI:
-        return 'Enter your custom API endpoint URL';
+        return 'Enter your custom backend API endpoint URL';
     }
   }
-  
+
+  /// Maps the UI enum to the service-layer enum
+  ai_svc.AIProvider _mapToServiceProvider(AIProviderType p) {
+    switch (p) {
+      case AIProviderType.anthropic:    return ai_svc.AIProvider.anthropic;
+      case AIProviderType.openAI:       return ai_svc.AIProvider.openAI;
+      case AIProviderType.googleGemini: return ai_svc.AIProvider.googleGemini;
+      case AIProviderType.customAPI:    return ai_svc.AIProvider.customAPI;
+    }
+  }
+
   void _connectAI(BuildContext context) {
+    final key = _apiKey.trim();
+    final serviceProvider = _mapToServiceProvider(_selectedProvider);
+
+    // 1. Wire into AIProvider (used by hints / analysis screens)
     final aiProvider = Provider.of<AIProvider>(context, listen: false);
-    aiProvider.enableAI(_apiKey, provider: _selectedProvider);
-    
+    aiProvider.enableAI(key, provider: _selectedProvider);
+
+    // 2. Wire into GameProvider (used by post-game insight in result dialog)
+    final gameProvider = Provider.of<GameProvider>(context, listen: false);
+    gameProvider.setAIApiKey(key, provider: serviceProvider);
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('AI Assistant connected successfully!'),
+      SnackBar(
+        content: Text('${_selectedProvider.name} connected — AI insights enabled!'),
         backgroundColor: Colors.green,
       ),
     );
-    
+
     Navigator.pop(context);
   }
 }
