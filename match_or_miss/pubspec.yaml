@@ -9,37 +9,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  http: ^1.1.0
 
+  http: ^1.1.0
   flutter_secure_storage: ^9.0.0
-  # UI & Animation
   flutter_animate: ^4.0.0
-  
-  # State Management
   provider: ^6.1.1
-  
-  # Firebase
   firebase_core: ^2.24.2
   cloud_firestore: ^4.14.0
-  
-  # Utilities
-  assets_audio_player: ^3.1.0
   audioplayers: ^5.2.1
   shared_preferences: ^2.2.2
   intl: ^0.18.1
-  
-  # UI Components
   flutter_staggered_grid_view: ^0.7.0
-  fancy_bottom_navigation: ^0.3.3
   shimmer: ^3.0.0
-
   fl_chart: ^0.66.0
-
-    # Animations
   lottie: ^2.7.0
-
-  # Local storage
   sqflite: ^2.3.0
   path_provider: ^2.1.1
 
@@ -50,14 +33,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   assets:
-    - assets/sounds/placeholder.txt
+    - assets/sounds/background.mp3
+    - assets/sounds/submit.mp3
+    - assets/sounds/match.mp3
+    - assets/sounds/win.mp3
+    - assets/sounds/timeout.mp3
+    - assets/sounds/swap.mp3
+    - assets/sounds/error.mp3
     - assets/images/placeholder.txt
-  
-  # fonts:
-  #   - family: Orbitron
-  #     fonts:
-  #       - asset: fonts/Orbitron-Regular.ttf
-  #       - asset: fonts/Orbitron-Bold.ttf
-  #         weight: 700

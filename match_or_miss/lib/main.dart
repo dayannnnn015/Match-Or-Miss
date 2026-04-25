@@ -1,9 +1,10 @@
-// lib/main.dart (updated)
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
 import 'providers/multiplayer_provider.dart';
 import 'providers/ai_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
@@ -18,6 +19,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()..load()),
         ChangeNotifierProvider(create: (_) => GameProvider()),
         ChangeNotifierProvider(create: (_) => MultiplayerProvider()),
         ChangeNotifierProvider(create: (_) => AIProvider()),
