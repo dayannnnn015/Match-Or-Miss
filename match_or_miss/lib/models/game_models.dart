@@ -15,7 +15,7 @@ class GameSession {
   int timeBonus;
   GameStatus status;
   DateTime startTime;
-  List<Attempt> attempts;
+  List<Attempt> attempts; // ← mutable list, NOT const []
   List<Color> hiddenSequence;
 
   GameSession({
@@ -28,9 +28,9 @@ class GameSession {
     this.timeBonus = 0,
     this.status = GameStatus.waiting,
     required this.startTime,
-    this.attempts = const [],
+    List<Attempt>? attempts,      // ← nullable so we can default to a fresh mutable list
     required this.hiddenSequence,
-  });
+  }) : attempts = attempts ?? []; // ← always a growable list
 
   int get remainingTime {
     final elapsed = DateTime.now().difference(startTime).inSeconds;
@@ -45,6 +45,7 @@ class Attempt {
   final int attemptNumber;
   final List<Color> guess;
   final int matches;
+  final List<int> matchedPositions; // which indexes were correct
   final DateTime timestamp;
   final int variablesChanged;
   final bool wasImpulsive;
@@ -53,6 +54,7 @@ class Attempt {
     required this.attemptNumber,
     required this.guess,
     required this.matches,
+    required this.matchedPositions,
     required this.timestamp,
     required this.variablesChanged,
     this.wasImpulsive = false,
