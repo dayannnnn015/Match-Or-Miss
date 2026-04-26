@@ -15,7 +15,7 @@ class AudioService {
     try {
       await _player.play(AssetSource('sounds/$soundName.mp3'));
     } catch (e) {
-      print('Error playing sound: $e');
+      // Ignore audio playback errors
     }
   }
   

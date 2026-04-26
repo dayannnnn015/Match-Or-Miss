@@ -24,27 +24,37 @@ class BottleWidget extends StatelessWidget {
         width: size,
         height: size * 1.3,
         decoration: BoxDecoration(
-          border: Border.all(
-            color: isDragging ? Colors.white : Colors.white30,
-            width: isDragging ? 3 : 2,
-          ),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(size * 0.1),
           boxShadow: isDragging
               ? [
                   BoxShadow(
-                    color: bottle.color.withOpacity(0.6),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  )
+                    color: bottle.color.withValues(alpha: 0.7),
+                    blurRadius: 20,
+                    spreadRadius: 4,
+                  ),
+                  BoxShadow(
+                    color: bottle.color.withValues(alpha: 0.4),
+                    blurRadius: 40,
+                    spreadRadius: 8,
+                  ),
                 ]
-              : [],
+              : [
+                  BoxShadow(
+                    color: bottle.color.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  )
+                ],
         ),
-        child: CustomPaint(
-          painter: BottlePainter(
-            liquidColor: bottle.color,
-            isDragging: isDragging,
+        child: Transform.scale(
+          scale: isDragging ? 1.1 : 1.0,
+          child: CustomPaint(
+            painter: BottlePainter(
+              liquidColor: bottle.color,
+              isDragging: isDragging,
+            ),
+            size: Size(size, size * 1.3),
           ),
-          size: Size(size, size * 1.3),
         ),
       ),
     );
@@ -68,12 +78,12 @@ class BottlePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final Paint borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.5)
+      ..color = Colors.white.withValues(alpha: 0.5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
     final Paint highlightPaint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
+      ..color = Colors.white.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
     // Bottle cap/neck (top)

@@ -11,7 +11,6 @@ class FirebaseService {
     try {
       return DateTime.now().millisecondsSinceEpoch.toString();
     } catch (e) {
-      print("Error signing in: $e");
       return '';
     }
   }
@@ -43,7 +42,7 @@ class FirebaseService {
         }
       });
     } catch (e) {
-      print("Error saving game result: $e");
+      // Ignore save errors
     }
   }
 

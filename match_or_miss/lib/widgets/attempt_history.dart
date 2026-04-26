@@ -86,20 +86,20 @@ class AttemptHistory extends StatelessWidget {
 
   Widget _buildAttemptRow(Attempt attempt, bool isLatest) {
     final matchCount = attempt.matches;
-    final total = AppConstants.sequenceLength;
+    const total = AppConstants.sequenceLength;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isLatest
-            ? Colors.white.withOpacity(0.07)
-            : Colors.white.withOpacity(0.03),
+            ? Colors.white.withValues(alpha: 0.07)
+            : Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isLatest
-              ? Colors.white.withOpacity(0.15)
-              : Colors.white.withOpacity(0.05),
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.05),
           width: 1,
         ),
       ),
@@ -134,10 +134,10 @@ class AttemptHistory extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: _badgeColor(matchCount, total).withOpacity(0.2),
+              color: _badgeColor(matchCount, total).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _badgeColor(matchCount, total).withOpacity(0.5),
+                color: _badgeColor(matchCount, total).withValues(alpha: 0.5),
               ),
             ),
             child: Text(
@@ -182,7 +182,7 @@ class AttemptHistory extends StatelessWidget {
         boxShadow: isMatched
             ? [
                 BoxShadow(
-                  color: Colors.greenAccent.withOpacity(0.4),
+                  color: Colors.greenAccent.withValues(alpha: 0.4),
                   blurRadius: 6,
                   spreadRadius: 1,
                 )

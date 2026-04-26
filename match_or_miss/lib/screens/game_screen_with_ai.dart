@@ -4,21 +4,49 @@ import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../models/game_models.dart';
 import '../services/game_service.dart';
-import '../widgets/bottle_slot.dart';
 import '../widgets/bottle_widget.dart';
-import '../widgets/attempt_history.dart';
 import '../widgets/timer_widget.dart';
 
 class GameScreenWithAI extends StatefulWidget {
   const GameScreenWithAI({super.key});
 
   @override
-  _GameScreenWithAIState createState() => _GameScreenWithAIState();
+  State<GameScreenWithAI> createState() => GameScreenWithAIState();
 }
 
-class _GameScreenWithAIState extends State<GameScreenWithAI> {
+class GameScreenWithAIState extends State<GameScreenWithAI>
+    with TickerProviderStateMixin {
   bool _gameFinished = false;
   bool _resultShown = false;
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+    // Check game state periodically
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _checkGamePeriodically();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  void _checkGamePeriodically() {
+    if (!mounted) return;
+    final provider = context.read<GameProvider>();
+    provider.checkGameState();
+    if (!_gameFinished) {
+      Future.delayed(const Duration(milliseconds: 300), _checkGamePeriodically);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +62,17 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
           final session = gameProvider.currentSession!;
           final mode = session.mode;
 
+          // Reset dialog flags when a new game starts
+          if (_resultShown && _gameFinished) {
+            _gameFinished = false;
+            _resultShown = false;
+          }
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_resultShown && mounted) {
-              _checkEndConditions(gameProvider);
+            if (!_resultShown && gameProvider.isSolved() && mounted) {
+              _gameFinished = true;
+              _resultShown = true;
+              _showResultDialog(gameProvider, won: true);
             }
           });
 
@@ -55,23 +91,12 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
                   _buildModeBadge(mode),
                   if (mode == GameMode.competitive)
                     _buildCompetitiveBar(session),
-                  Expanded(
-                    flex: 2,
-                    child: _buildGameSlots(gameProvider, session),
-                  ),
-                  _buildFeedbackArea(gameProvider),
-                  Expanded(
-                    flex: 1,
-                    child: _buildAvailableBottles(gameProvider, session),
-                  ),
-                  _buildActionButtons(gameProvider),
-                  if (gameProvider.showHistory)
-                    Expanded(
-                      child: AttemptHistory(
-                        attempts: session.attempts,
-                        isVisible: gameProvider.showHistory,
-                      ),
-                    ),
+                  const SizedBox(height: 20),
+                  _buildFeedback(gameProvider, session),
+                  const SizedBox(height: 20),
+                  _buildDraggableBottles(gameProvider, session),
+                  const SizedBox(height: 16),
+                  _buildResetButton(gameProvider),
                 ],
               ),
             ),
@@ -102,16 +127,26 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Score: ${gameProvider.currentSession?.currentScore ?? 0}',
-                style: const TextStyle(
-                  fontSize: 18,
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 500),
+                style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.cyanAccent,
+                  shadows: [
+                    Shadow(
+                      color: Colors.cyanAccent.withValues(alpha: 0.5),
+                      blurRadius: 10,
+                    )
+                  ],
+                ),
+                child: Text(
+                  'Moves: ${gameProvider.currentSession?.currentMoves ?? 0}',
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
-                'Moves: ${gameProvider.currentSession?.currentMoves ?? 0}/${gameProvider.currentSession?.maxMoves ?? 0}',
+                'Score: ${gameProvider.currentSession?.currentScore ?? 0}',
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.white70,
@@ -119,28 +154,7 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
               ),
             ],
           ),
-          TimerWidget(
-            remainingTime: gameProvider.currentSession?.remainingTime ?? 0,
-            onTimeout: () {
-              // Handle timeout if needed
-            },
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (gameProvider.hasHint)
-                Text(
-                  gameProvider.lastHint,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.yellowAccent,
-                  ),
-                  textAlign: TextAlign.right,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-            ],
-          ),
+          const TimerWidget(),
         ],
       ),
     );
@@ -150,20 +164,40 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
     final String modeText = mode.toString().split('.').last.toUpperCase();
     final Color modeColor = _getModeColor(mode);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: modeColor.withOpacity(0.2),
-        border: Border.all(color: modeColor, width: 2),
-        borderRadius: BorderRadius.circular(8),
+    return ScaleTransition(
+      scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+        CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
       ),
-      child: Text(
-        modeText,
-        style: TextStyle(
-          color: modeColor,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              modeColor.withValues(alpha: 0.3),
+              modeColor.withValues(alpha: 0.1),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(color: modeColor, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: modeColor.withValues(alpha: 0.3),
+              blurRadius: 12,
+              spreadRadius: 1,
+            )
+          ],
+        ),
+        child: Text(
+          '⚡ $modeText',
+          style: TextStyle(
+            color: modeColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
         ),
       ),
     );
@@ -185,7 +219,7 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         border: Border.all(color: Colors.redAccent, width: 1),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -214,104 +248,59 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
     );
   }
 
-  Widget _buildGameSlots(GameProvider gameProvider, GameSession session) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Target Slots - Drag bottles here:',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.8,
-              ),
-              itemCount: gameProvider.currentGuessSlots.length,
-              itemBuilder: (context, index) {
-                return BottleSlot(
-                  index: index,
-                  bottle: gameProvider.currentGuessSlots[index],
-                  onBottleDropped: (slotIndex, bottle) {
-                    gameProvider.placeBottle(slotIndex, bottle);
-                  },
-                  onBottleRemoved: () {
-                    gameProvider.removeBottle(index);
-                  },
-                  isEnabled: !gameProvider.isSubmitting && !_gameFinished,
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildAvailableBottles(GameProvider gameProvider, GameSession session) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+
+  Widget _buildFeedback(GameProvider gameProvider, GameSession session) {
+    final currentMatches = gameProvider.getCurrentMatches();
+    const maxMatches = GameService.SEQUENCE_LENGTH;
+    final isSolved = gameProvider.isSolved();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutBack,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isSolved ? Colors.green.withValues(alpha: 0.15) : Colors.blue.withValues(alpha: 0.1),
+        border: Border.all(
+          color: isSolved ? Colors.greenAccent : Colors.cyanAccent,
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isSolved
+            ? [
+                BoxShadow(
+                  color: Colors.greenAccent.withValues(alpha: 0.5),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                )
+              ]
+            : [],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Available Bottles - Drag to slots:',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          AnimatedScale(
+            scale: isSolved ? 1.1 : 1.0,
+            duration: const Duration(milliseconds: 600),
+            child: Text(
+              isSolved ? '🎉 SOLVED!' : 'Correct Positions',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.cyanAccent,
+              ),
             ),
           ),
           const SizedBox(height: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: session.availableBottles
-                    .map(
-                      (bottle) => Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: Draggable<Bottle>(
-                          data: bottle,
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: BottleWidget(
-                              bottle: bottle,
-                              size: 60,
-                              isDragging: true,
-                            ),
-                          ),
-                          childWhenDragging: Container(
-                            width: 60,
-                            height: 78,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Colors.grey.shade600,
-                                width: 2,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.grey.shade800.withOpacity(0.5),
-                            ),
-                          ),
-                          child: BottleWidget(
-                            bottle: bottle,
-                            size: 60,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 500),
+            style: TextStyle(
+              fontSize: isSolved ? 32 : 28,
+              fontWeight: FontWeight.bold,
+              color: isSolved ? Colors.greenAccent : Colors.white,
+            ),
+            child: Text(
+              '$currentMatches / $maxMatches',
             ),
           ),
         ],
@@ -319,65 +308,50 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
     );
   }
 
-  Widget _buildFeedbackArea(GameProvider gameProvider) {
-    final session = gameProvider.currentSession;
-    if (session == null || session.attempts.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            border: Border.all(color: Colors.cyanAccent, width: 1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Text(
-            '💡 Arrange all 4 bottles in the target slots and submit to check your guess!',
-            style: TextStyle(
-              color: Colors.cyanAccent,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final lastAttempt = session.attempts.last;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: lastAttempt.matches == GameService.SEQUENCE_LENGTH
-              ? Colors.green.withOpacity(0.1)
-              : Colors.orange.withOpacity(0.1),
-          border: Border.all(
-            color: lastAttempt.matches == GameService.SEQUENCE_LENGTH
-                ? Colors.greenAccent
-                : Colors.orangeAccent,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
+  Widget _buildDraggableBottles(GameProvider gameProvider, GameSession session) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
           children: [
-            Icon(
-              lastAttempt.matches == GameService.SEQUENCE_LENGTH
-                  ? Icons.check_circle
-                  : Icons.info,
-              color: lastAttempt.matches == GameService.SEQUENCE_LENGTH
-                  ? Colors.greenAccent
-                  : Colors.orangeAccent,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+            ShaderMask(
+              shaderCallback: (bounds) => LinearGradient(
+                colors: [Colors.cyan, Colors.cyanAccent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ).createShader(bounds),
               child: Text(
-                'Correct positions: ${lastAttempt.matches}/${GameService.SEQUENCE_LENGTH}',
+                'Drag to swap bottles:',
                 style: TextStyle(
-                  color: lastAttempt.matches == GameService.SEQUENCE_LENGTH
-                      ? Colors.greenAccent
-                      : Colors.orangeAccent,
+                  color: Colors.white,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(
+                    gameProvider.currentGuessSlots.length,
+                    (index) {
+                      final bottle = gameProvider.currentGuessSlots[index];
+
+                      if (bottle == null) return const SizedBox.shrink();
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _buildAnimatedBottleWrapper(
+              bottle,
+              index,
+              gameProvider,
+            ),
+          );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -387,63 +361,132 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
     );
   }
 
-  Widget _buildActionButtons(GameProvider gameProvider) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: gameProvider.isSubmitting
-                  ? null
-                  : () => gameProvider.resetGuess(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reset'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey.shade700,
-                disabledBackgroundColor: Colors.grey.shade800,
-              ),
-            ),
+  Widget _buildAnimatedBottleWrapper(
+    Bottle bottle,
+    int index,
+    GameProvider gameProvider,
+  ) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 300 + (index * 50)),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return ScaleTransition(
+          scale: AlwaysStoppedAnimation(value),
+          child: FadeTransition(
+            opacity: AlwaysStoppedAnimation(value),
+            child: child,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: gameProvider.isSubmitting || !gameProvider.canSubmit
-                  ? null
-                  : () => gameProvider.submitGuess(),
-              icon: const Icon(Icons.check),
-              label: const Text('Submit'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.cyanAccent,
-                disabledBackgroundColor: Colors.cyan.withOpacity(0.3),
-              ),
-            ),
-          ),
-        ],
+        );
+      },
+      child: _buildDraggableBottle(
+        bottle,
+        index,
+        gameProvider,
       ),
     );
   }
 
-  void _checkEndConditions(GameProvider gp) {
-    if (_resultShown || _gameFinished) return;
-    final session = gp.currentSession;
-    if (session == null || session.attempts.isEmpty) return;
+  Widget _buildDraggableBottle(
+    Bottle bottle,
+    int index,
+    GameProvider gameProvider,
+  ) {
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) {
+        if (details.data != index) {
+          gameProvider.swapBottles(details.data, index);
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        return Draggable<int>(
+          data: index,
+          feedback: Material(
+            color: Colors.transparent,
+            child: ScaleTransition(
+              scale: AlwaysStoppedAnimation(1.15),
+              child: BottleWidget(
+                bottle: bottle,
+                size: 70,
+                isDragging: true,
+              ),
+            ),
+          ),
+          childWhenDragging: SizedBox(
+            width: 70,
+            height: 91,
+            child: Opacity(
+              opacity: 0.4,
+              child: BottleWidget(
+                bottle: bottle,
+                size: 70,
+              ),
+            ),
+          ),
+          child: AnimatedScale(
+            scale: candidateData.isNotEmpty ? 1.05 : 1.0,
+            duration: const Duration(milliseconds: 200),
+            child: BottleWidget(
+              bottle: bottle,
+              size: 70,
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    final last = session.attempts.last;
-    final solved = last.matches == GameService.SEQUENCE_LENGTH;
-    final outOfMoves = session.currentMoves >= session.maxMoves;
-
-    if (solved) {
-      _gameFinished = true;
-      _resultShown = true;
-      gp.loadPostGameInsight();
-      _showResultDialog(gp, won: true);
-    } else if (outOfMoves) {
-      _gameFinished = true;
-      _resultShown = true;
-      gp.loadPostGameInsight();
-      _showResultDialog(gp, won: false);
-    }
+  Widget _buildResetButton(GameProvider gameProvider) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: SizedBox(
+        width: double.infinity,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [Colors.grey.shade600, Colors.grey.shade800],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              )
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => gameProvider.resetGuess(),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.restart_alt, color: Colors.white),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Reset Game',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showResultDialog(GameProvider gp, {required bool won}) {
@@ -500,6 +543,17 @@ class _GameScreenWithAIState extends State<GameScreenWithAI> {
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<GameProvider>().initializeGame(
+                context.read<GameProvider>().currentSession?.mode ?? GameMode.standard,
+              );
+              _gameFinished = false;
+              _resultShown = false;
+            },
+            child: const Text('Next Game'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);

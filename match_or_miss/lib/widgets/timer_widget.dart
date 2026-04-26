@@ -1,50 +1,34 @@
 // lib/widgets/timer_widget.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/game_provider.dart';
+import '../models/game_models.dart';
 import 'dart:async';
 
 class TimerWidget extends StatefulWidget {
-  final int remainingTime;
-  final VoidCallback onTimeout;
-
   const TimerWidget({
     super.key,
-    required this.remainingTime,
-    required this.onTimeout,
   });
 
   @override
-  _TimerWidgetState createState() => _TimerWidgetState();
+  State<TimerWidget> createState() => TimerWidgetState();
 }
 
-class _TimerWidgetState extends State<TimerWidget> {
+class TimerWidgetState extends State<TimerWidget> {
   late Timer _timer;
-  late int _remainingSeconds;
+  int _elapsedSeconds = 0;
 
   @override
   void initState() {
     super.initState();
-    _remainingSeconds = widget.remainingTime;
     _startTimer();
-  }
-
-  @override
-  void didUpdateWidget(TimerWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.remainingTime != oldWidget.remainingTime) {
-      _remainingSeconds = widget.remainingTime;
-    }
   }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 0) {
-        setState(() {
-          _remainingSeconds--;
-        });
-      } else {
-        _timer.cancel();
-        widget.onTimeout();
-      }
+      setState(() {
+        _elapsedSeconds++;
+      });
     });
   }
 
@@ -56,29 +40,53 @@ class _TimerWidgetState extends State<TimerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    Duration duration = Duration(seconds: _remainingSeconds);
-    String timeString = _formatDuration(duration);
+    return Consumer<GameProvider>(
+      builder: (context, gameProvider, _) {
+        final session = gameProvider.currentSession;
+        if (session == null) return const SizedBox.shrink();
 
-    Color timerColor = _getTimerColor();
+        final mode = session.mode;
+        
+        // Quick mode: no timer display
+        if (mode == GameMode.quick) {
+          return const SizedBox.shrink();
+        }
+        
+        // Standard & Competitive modes: show stopwatch (elapsed time)
+        Duration duration = Duration(seconds: _elapsedSeconds);
+        String timeString = _formatDuration(duration);
+        Color timerColor = mode == GameMode.standard ? Colors.blueAccent : Colors.redAccent;
+        return _buildTimerContainer(timeString, timerColor);
+      },
+    );
+  }
 
+  Widget _buildTimerContainer(String timeString, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
+        color: Colors.black.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: timerColor, width: 2),
+        border: Border.all(color: color, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 12,
+            spreadRadius: 1,
+          )
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.timer, color: timerColor),
+          Icon(Icons.schedule, color: color),
           const SizedBox(width: 8),
           Text(
             timeString,
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: timerColor,
+              color: color,
               fontFamily: 'Monospace',
             ),
           ),
@@ -92,11 +100,5 @@ class _TimerWidgetState extends State<TimerWidget> {
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
     String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return "$twoDigitMinutes:$twoDigitSeconds";
-  }
-
-  Color _getTimerColor() {
-    if (_remainingSeconds > 60) return Colors.green;
-    if (_remainingSeconds > 30) return Colors.orange;
-    return Colors.red;
   }
 }

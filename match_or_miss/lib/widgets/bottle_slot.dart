@@ -55,12 +55,12 @@ class _BottleSlotState extends State<BottleSlot> {
             ),
             borderRadius: BorderRadius.circular(8),
             color: _isDragOver
-                ? Colors.cyanAccent.withOpacity(0.1)
-                : Colors.white.withOpacity(0.05),
+                ? Colors.cyanAccent.withValues(alpha: 0.1)
+                : Colors.white.withValues(alpha: 0.05),
             boxShadow: _isDragOver
                 ? [
                     BoxShadow(
-                      color: Colors.cyanAccent.withOpacity(0.5),
+                      color: Colors.cyanAccent.withValues(alpha: 0.5),
                       blurRadius: 8,
                       spreadRadius: 1,
                     )
@@ -88,7 +88,7 @@ class _BottleSlotState extends State<BottleSlot> {
                               width: 2,
                             ),
                             borderRadius: BorderRadius.circular(8),
-                            color: Colors.grey.shade800.withOpacity(0.5),
+                            color: Colors.grey.shade800.withValues(alpha: 0.5),
                           ),
                         ),
                         child: BottleWidget(
@@ -125,7 +125,7 @@ class _BottleSlotState extends State<BottleSlot> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.add,
                         color: Colors.white30,
                         size: 32,
@@ -133,7 +133,7 @@ class _BottleSlotState extends State<BottleSlot> {
                       const SizedBox(height: 4),
                       Text(
                         'Slot ${widget.index + 1}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white30,
                           fontSize: 10,
                         ),

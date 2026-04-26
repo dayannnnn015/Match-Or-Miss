@@ -114,7 +114,7 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.cyan.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? Colors.cyan.withValues(alpha: 0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: isSelected ? Border.all(color: Colors.cyan) : null,
         ),
