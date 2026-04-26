@@ -13,45 +13,73 @@ class GameService {
 
   static String getColorName(Color color) => AppConstants.getColorName(color);
 
-  /// Hidden sequence: a random permutation of all 8 colors.
+  /// Hidden sequence: bottles with random permutation of all colors.
   /// Every color appears exactly once — player knows this as a rule.
-  List<Color> generateHiddenSequence() {
-    final list = List<Color>.from(AVAILABLE_COLORS);
-    list.shuffle(Random());
-    return list;
+  List<Bottle> generateHiddenSequence() {
+    final colors = List<Color>.from(AVAILABLE_COLORS);
+    colors.shuffle(Random());
+    final result = <Bottle>[];
+    for (int i = 0; i < colors.length; i++) {
+      result.add(Bottle(
+        id: 'hidden_$i',
+        color: colors[i],
+        position: i,
+      ));
+    }
+    return result;
   }
 
-  /// Valid guess: all 8 slots filled, no grey, no duplicates.
-  bool isValidGuess(List<Color> guess) {
+  /// Generate available bottles for dragging (shuffled order)
+  List<Bottle> generateAvailableBottles(List<Bottle> hidden) {
+    final availableColors = hidden.map((b) => b.color).toList();
+    availableColors.shuffle(Random());
+    final result = <Bottle>[];
+    for (int i = 0; i < availableColors.length; i++) {
+      result.add(Bottle(
+        id: 'available_$i',
+        color: availableColors[i],
+        position: i,
+      ));
+    }
+    return result;
+  }
+
+  /// Valid guess: all slots filled with unique bottles
+  bool isValidGuess(List<Bottle?> guess) {
     if (guess.length != SEQUENCE_LENGTH) return false;
-    if (guess.contains(Colors.grey)) return false;
-    return guess.toSet().length == SEQUENCE_LENGTH;
+    if (guess.contains(null)) return false;
+    final colors = guess.cast<Bottle>().map((b) => b.color).toSet();
+    return colors.length == SEQUENCE_LENGTH;
   }
 
-  int calculateMatches(List<Color> guess, List<Color> hidden) {
+  int calculateMatches(List<Bottle?> guess, List<Bottle> hidden) {
     int matches = 0;
     for (int i = 0; i < SEQUENCE_LENGTH; i++) {
-      if (guess[i] == hidden[i]) matches++;
+      if (guess[i] != null && guess[i]!.color == hidden[i].color) {
+        matches++;
+      }
     }
     return matches;
   }
 
-  /// Returns the list of indexes where guess[i] == hidden[i]
-  List<int> getMatchedPositions(List<Color> guess, List<Color> hidden) {
+  /// Returns the list of indexes where guess colors match hidden colors
+  List<int> getMatchedPositions(List<Bottle?> guess, List<Bottle> hidden) {
     final positions = <int>[];
     for (int i = 0; i < SEQUENCE_LENGTH; i++) {
-      if (guess[i] == hidden[i]) positions.add(i);
+      if (guess[i] != null && guess[i]!.color == hidden[i].color) {
+        positions.add(i);
+      }
     }
     return positions;
   }
 
-  bool isSequenceSolved(List<Color> guess, List<Color> hidden) =>
+  bool isSequenceSolved(List<Bottle?> guess, List<Bottle> hidden) =>
       calculateMatches(guess, hidden) == SEQUENCE_LENGTH;
 
-  int calculateVariablesChanged(List<Color> previous, List<Color> current) {
+  int calculateVariablesChanged(List<Bottle?> previous, List<Bottle?> current) {
     int changes = 0;
     for (int i = 0; i < SEQUENCE_LENGTH; i++) {
-      if (previous[i] != current[i]) changes++;
+      if (previous[i]?.id != current[i]?.id) changes++;
     }
     return changes;
   }
@@ -94,17 +122,17 @@ class GameService {
 
   String getStrategyHint(int attemptsCount, int maxMatches) {
     if (attemptsCount == 0) {
-      return 'Each color is used exactly once. Swap positions to find the right order.';
+      return 'Each color is used exactly once. Drag bottles into slots to find the right order.';
     }
     if (maxMatches == 0) {
-      return 'No matches yet — every bottle is wrong. Try rotating them all.';
+      return 'No matches yet — every bottle is in the wrong position. Try swapping them all.';
     }
     if (maxMatches > 0 && maxMatches < 4) {
-      return 'You have $maxMatches correct! Lock those in and swap the rest.';
+      return 'You have $maxMatches correct positions! Lock those in and swap the rest.';
     }
     if (maxMatches >= 4) {
       return 'More than halfway! Focus on the remaining ${SEQUENCE_LENGTH - maxMatches} positions.';
     }
-    return 'Swap only 1–2 bottles at a time to isolate what\'s correct.';
+    return 'Drag only 1–2 bottles at a time to isolate what\'s correct.';
   }
 }

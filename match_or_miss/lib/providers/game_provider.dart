@@ -13,10 +13,10 @@ class GameProvider extends ChangeNotifier {
   final ai_svc.OpenAIService _openAIService = ai_svc.OpenAIService();
 
   GameSession? _currentSession;
-  List<Color> _currentGuess = [];
+  List<Bottle?> _currentGuessSlots = [];
   bool _isSubmitting = false;
   bool _showHistory = true;
-  List<Color> _previousGuess = [];
+  List<Bottle?> _previousGuess = [];
 
   String _postGameInsight = '';
   bool _isLoadingInsight = false;
@@ -29,13 +29,13 @@ class GameProvider extends ChangeNotifier {
   bool get hasAIKey => _openAIService.hasValidKey;
 
   GameSession? get currentSession => _currentSession;
-  List<Color> get currentGuess => _currentGuess;
+  List<Bottle?> get currentGuessSlots => _currentGuessSlots;
   bool get isSubmitting => _isSubmitting;
   bool get showHistory => _showHistory;
 
   bool get canSubmit {
-    if (_currentGuess.isEmpty) return false;
-    return _gameService.isValidGuess(_currentGuess);
+    if (_currentGuessSlots.isEmpty) return false;
+    return _gameService.isValidGuess(_currentGuessSlots);
   }
 
   GameProvider() {
@@ -90,6 +90,7 @@ class GameProvider extends ChangeNotifier {
 
   void initializeGame(GameMode mode) {
     final hidden = _gameService.generateHiddenSequence();
+    final available = _gameService.generateAvailableBottles(hidden);
     _currentSession = GameSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       mode: mode,
@@ -97,9 +98,11 @@ class GameProvider extends ChangeNotifier {
       maxMoves: _getMaxMoves(mode),
       startTime: DateTime.now(),
       hiddenSequence: hidden,
+      currentGuessSlots: List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null),
+      availableBottles: available,
     );
-    _currentGuess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
-    _previousGuess = List.from(_currentGuess);
+    _currentGuessSlots = List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null);
+    _previousGuess = List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null);
     _isSubmitting = false;
     _lastHint = '';
     _postGameInsight = '';
@@ -125,17 +128,30 @@ class GameProvider extends ChangeNotifier {
 
   // ─── Guess handling ────────────────────────────────────────────────────────
 
-  void updateGuess(int index, Color color) {
-    if (_isSubmitting) return;
-    _currentGuess[index] = color;
+  void placeBottle(int slotIndex, Bottle bottle) {
+    if (_isSubmitting || _currentSession == null) return;
+    _currentGuessSlots[slotIndex] = bottle;
+    // Remove from available if already used
+    _currentSession!.availableBottles
+        .removeWhere((b) => b.id == bottle.id);
     notifyListeners();
   }
 
-  void swapGuess(int index1, int index2) {
+  void removeBottle(int slotIndex) {
+    if (_isSubmitting || _currentSession == null) return;
+    final bottle = _currentGuessSlots[slotIndex];
+    if (bottle != null) {
+      _currentSession!.availableBottles.add(bottle);
+      _currentGuessSlots[slotIndex] = null;
+      notifyListeners();
+    }
+  }
+
+  void swapBottles(int slotIndex1, int slotIndex2) {
     if (_isSubmitting) return;
-    final temp = _currentGuess[index1];
-    _currentGuess[index1] = _currentGuess[index2];
-    _currentGuess[index2] = temp;
+    final temp = _currentGuessSlots[slotIndex1];
+    _currentGuessSlots[slotIndex1] = _currentGuessSlots[slotIndex2];
+    _currentGuessSlots[slotIndex2] = temp;
     notifyListeners();
   }
 
@@ -150,13 +166,13 @@ class GameProvider extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 300));
 
     final variablesChanged = _gameService.calculateVariablesChanged(
-      _previousGuess.every((c) => c == Colors.grey) ? _currentGuess : _previousGuess,
-      _currentGuess,
+      _previousGuess.any((b) => b != null) ? _previousGuess : _currentGuessSlots,
+      _currentGuessSlots,
     );
     final matches = _gameService.calculateMatches(
-        _currentGuess, _currentSession!.hiddenSequence);
+        _currentGuessSlots, _currentSession!.hiddenSequence);
     final matchedPositions = _gameService.getMatchedPositions(
-        _currentGuess, _currentSession!.hiddenSequence);
+        _currentGuessSlots, _currentSession!.hiddenSequence);
     final prevMatches = _currentSession!.attempts.isNotEmpty
         ? _currentSession!.attempts.last.matches
         : 0;
@@ -165,7 +181,7 @@ class GameProvider extends ChangeNotifier {
 
     final attempt = Attempt(
       attemptNumber: _currentSession!.currentMoves + 1,
-      guess: List.from(_currentGuess),
+      guess: List.from(_currentGuessSlots),
       matches: matches,
       matchedPositions: matchedPositions,
       timestamp: DateTime.now(),
@@ -175,12 +191,12 @@ class GameProvider extends ChangeNotifier {
 
     _currentSession!.attempts.add(attempt);
     _currentSession!.currentMoves++;
-    _previousGuess = List.from(_currentGuess);
+    _previousGuess = List.from(_currentGuessSlots);
 
     // Local hint — instant, no network
     _lastHint = _aiService.getRealTimeHint(attempt, _currentSession!.currentMoves);
 
-    if (_gameService.isSequenceSolved(_currentGuess, _currentSession!.hiddenSequence)) {
+    if (_gameService.isSequenceSolved(_currentGuessSlots, _currentSession!.hiddenSequence)) {
       final score = _gameService.calculateScore(
         matches,
         _currentSession!.currentMoves,
@@ -281,14 +297,21 @@ class GameProvider extends ChangeNotifier {
   }
 
   void resetGuess() {
-    _currentGuess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
+    if (_currentSession == null) return;
+    // Return all bottles to available pool
+    for (var bottle in _currentGuessSlots) {
+      if (bottle != null) {
+        _currentSession!.availableBottles.add(bottle);
+      }
+    }
+    _currentGuessSlots = List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null);
     _lastHint = '';
     notifyListeners();
   }
 
   void resetGame() {
     _currentSession = null;
-    _currentGuess = [];
+    _currentGuessSlots = [];
     _isSubmitting = false;
     _lastHint = '';
     _postGameInsight = '';
