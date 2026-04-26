@@ -194,7 +194,7 @@ class _Result {
 
 class _MPRound extends StatefulWidget {
   final _MPMode mode;
-  final List<Color> hidden;
+  final List<Bottle> hidden;
   final String p1, p2;
   const _MPRound({required this.mode, required this.hidden, required this.p1, required this.p2});
 
@@ -236,7 +236,7 @@ class _MPRoundState extends State<_MPRound> {
 class _ActiveGame extends StatefulWidget {
   final String name;
   final Color color;
-  final List<Color> hidden;
+  final List<Bottle> hidden;
   final _MPMode mode;
   final void Function(_Result) onDone;
   const _ActiveGame({required this.name, required this.color, required this.hidden,
@@ -254,7 +254,7 @@ class _ActiveGameState extends State<_ActiveGame> {
   final _gs = GameService();
   final _ai = AIService();
 
-  late List<Color> _guess;
+  late List<Bottle?> _guess;
   bool _submitting = false;
   int _moves = 0;
   int? _lastMatch;
@@ -270,7 +270,7 @@ class _ActiveGameState extends State<_ActiveGame> {
   @override
   void initState() {
     super.initState();
-    _guess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
+    _guess = List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null);
     // Both modes use a timer:
     // Race  — counts UP   (fastest solver wins)
     // Turn  — counts DOWN (auto-ends turn at time limit so no one stalls)
@@ -303,8 +303,8 @@ class _ActiveGameState extends State<_ActiveGame> {
   void dispose() { _timer?.cancel(); super.dispose(); }
 
   bool get _canSubmit => _gs.isValidGuess(_guess) && !_submitting && !_done;
-  bool get _allFilled => !_guess.contains(Colors.grey);
-  bool get _hasDup => _allFilled && _guess.toSet().length < GameService.SEQUENCE_LENGTH;
+  bool get _allFilled => !_guess.contains(null);
+  bool get _hasDup => false; // Bottles can't be duplicated since we only have unique ones
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
@@ -356,9 +356,9 @@ class _ActiveGameState extends State<_ActiveGame> {
     }
   }
 
-  void _pick(int i, Color c) {
+  void _pick(int i, Bottle b) {
     if (_done || _submitting) return;
-    setState(() => _guess[i] = c);
+    setState(() => _guess[i] = b);
   }
 
   void _showPicker(int i) {
@@ -378,16 +378,18 @@ class _ActiveGameState extends State<_ActiveGame> {
                 style: TextStyle(color: Colors.white38, fontSize: 11)),
             const SizedBox(height: 16),
             Wrap(spacing: 12, runSpacing: 12,
-              children: AppConstants.availableColors.map((c) {
-                final used = _guess.contains(c) && _guess[i] != c;
+              children: AppConstants.availableColors.asMap().entries.map((e) {
+                final color = e.value;
+                final bottle = Bottle(id: 'mp_${i}_${e.key}', color: color, position: i);
+                final used = _guess.any((b) => b?.color == color) && _guess[i]?.color != color;
                 return GestureDetector(
-                  onTap: used ? null : () { _pick(i, c); Navigator.pop(context); },
+                  onTap: used ? null : () { _pick(i, bottle); Navigator.pop(context); },
                   child: Opacity(
                     opacity: used ? 0.25 : 1.0,
                     child: Container(
                       width: 52, height: 52,
                       decoration: BoxDecoration(
-                        color: c, shape: BoxShape.circle,
+                        color: color, shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: used ? const Icon(Icons.block, color: Colors.white54, size: 20) : null,
@@ -504,8 +506,9 @@ class _ActiveGameState extends State<_ActiveGame> {
                     mainAxisSpacing: 10, childAspectRatio: 0.8),
                 itemCount: GameService.SEQUENCE_LENGTH,
                 itemBuilder: (_, i) {
-                  final c = _guess[i];
-                  final isEmpty = c == Colors.grey;
+                  final b = _guess[i];
+                  final isEmpty = b == null;
+                  final c = b?.color;
                   // ← highlight current guess positions that matched on last submit
                   final isMatched = _lastMatchedPositions.contains(i);
                   return GestureDetector(
@@ -530,7 +533,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                         Center(child: isEmpty
                             ? const Icon(Icons.add, color: Colors.white30, size: 28)
                             : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Text(AppConstants.getColorName(c),
+                                Text(AppConstants.getColorName(c!),
                                     style: const TextStyle(color: Colors.white,
                                         fontSize: 10, fontWeight: FontWeight.bold),
                                     textAlign: TextAlign.center),
@@ -580,11 +583,13 @@ class _ActiveGameState extends State<_ActiveGame> {
                       // Mini bottle row with green borders on matched positions
                       ...List.generate(GameService.SEQUENCE_LENGTH, (idx) {
                         final matched = a.matchedPositions.contains(idx);
+                        final bottle = a.guess[idx];
+                        final bottleColor = bottle?.color ?? Colors.grey;
                         return Container(
                           width: 18, height: 22,
                           margin: const EdgeInsets.symmetric(horizontal: 1),
                           decoration: BoxDecoration(
-                            color: a.guess[idx],
+                            color: bottleColor,
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
                               color: matched ? Colors.greenAccent : Colors.white24,
@@ -631,18 +636,6 @@ class _ActiveGameState extends State<_ActiveGame> {
           ),
         ])),
       ),
-    );
-  }
-
-  Widget _buildCountdown() {
-    final remaining = _timeLimit - _secs;
-    final mins = remaining ~/ 60;
-    final secs = (remaining % 60).toString().padLeft(2, '0');
-    final isUrgent = remaining <= 30;
-    final color = isUrgent ? Colors.redAccent : Colors.white54;
-    return _chip(
-      isUrgent ? '⚠️ $mins:$secs' : '⏱ $mins:$secs',
-      color,
     );
   }
 

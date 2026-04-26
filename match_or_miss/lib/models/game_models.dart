@@ -5,6 +5,31 @@ enum GameMode { quick, standard, competitive }
 
 enum GameStatus { waiting, active, paused, completed, timeout }
 
+/// Represents a bottle with liquid color
+class Bottle {
+  final String id;
+  final Color color;
+  final int position; // Position in the hidden sequence (for matching)
+
+  const Bottle({
+    required this.id,
+    required this.color,
+    required this.position,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Bottle &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          color == other.color &&
+          position == other.position;
+
+  @override
+  int get hashCode => id.hashCode ^ color.hashCode ^ position.hashCode;
+}
+
 class GameSession {
   final String id;
   final GameMode mode;
@@ -16,7 +41,9 @@ class GameSession {
   GameStatus status;
   DateTime startTime;
   List<Attempt> attempts; // ← mutable list, NOT const []
-  List<Color> hiddenSequence;
+  List<Bottle> hiddenSequence;
+  List<Bottle?> currentGuessSlots; // The bottles placed in slots (can be null for empty slots)
+  List<Bottle> availableBottles; // Bottles available to drag
 
   GameSession({
     required this.id,
@@ -28,9 +55,14 @@ class GameSession {
     this.timeBonus = 0,
     this.status = GameStatus.waiting,
     required this.startTime,
-    List<Attempt>? attempts,      // ← nullable so we can default to a fresh mutable list
+    List<Attempt>? attempts,
     required this.hiddenSequence,
-  }) : attempts = attempts ?? []; // ← always a growable list
+    List<Bottle?>? currentGuessSlots,
+    List<Bottle>? availableBottles,
+  })  : currentGuessSlots =
+            currentGuessSlots ?? List<Bottle?>.filled(hiddenSequence.length, null),
+        availableBottles = availableBottles ?? [],
+        attempts = attempts ?? [];
 
   int get remainingTime {
     final elapsed = DateTime.now().difference(startTime).inSeconds;
@@ -39,11 +71,12 @@ class GameSession {
 
   bool get isTimeUp => remainingTime <= 0;
   bool get isMovesExhausted => currentMoves >= maxMoves;
+  bool get isSlotsFilled => currentGuessSlots.every((b) => b != null);
 }
 
 class Attempt {
   final int attemptNumber;
-  final List<Color> guess;
+  final List<Bottle?> guess;
   final int matches;
   final List<int> matchedPositions; // which indexes were correct
   final DateTime timestamp;

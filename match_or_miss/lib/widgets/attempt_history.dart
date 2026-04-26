@@ -123,9 +123,9 @@ class AttemptHistory extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(total, (i) {
-                final color = attempt.guess[i];
+                final bottle = attempt.guess[i];
                 final isMatched = attempt.matchedPositions.contains(i);
-                return _buildBottleCell(color, isMatched);
+                return _buildBottleCell(bottle, isMatched);
               }),
             ),
           ),
@@ -154,24 +154,39 @@ class AttemptHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildBottleCell(Color color, bool isMatched) {
+  Widget _buildBottleCell(Bottle? bottle, bool isMatched) {
+    if (bottle == null) {
+      return Container(
+        width: 26,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade700,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+      );
+    }
+
     return Container(
       width: 26,
       height: 30,
       margin: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
-        color: color,
+        color: bottle.color,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isMatched ? Colors.greenAccent : Colors.white24,
           width: isMatched ? 2 : 1,
         ),
         boxShadow: isMatched
-            ? [BoxShadow(
-                color: Colors.greenAccent.withOpacity(0.4),
-                blurRadius: 6,
-                spreadRadius: 1,
-              )]
+            ? [
+                BoxShadow(
+                  color: Colors.greenAccent.withOpacity(0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                )
+              ]
             : null,
       ),
       child: isMatched
