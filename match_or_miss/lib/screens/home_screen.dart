@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
+import '../providers/ai_provider.dart';
 import '../models/game_models.dart';
+import '../widgets/api_key_dialog.dart';
 import 'game_screen_with_ai.dart';
 import 'multiplayer_screen.dart';
 import 'analysis_screen.dart';
@@ -62,9 +64,9 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => _showSettingsDialog(context),
           ),
           const Text('MATCH OR MISS',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
-                letterSpacing: 2, color: Colors.cyan,
-                shadows: [Shadow(color: Colors.cyan, blurRadius: 10)])),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
+                  letterSpacing: 2, color: Colors.cyan,
+                  shadows: [Shadow(color: Colors.cyan, blurRadius: 10)])),
           IconButton(
             icon: const Icon(Icons.leaderboard, color: Colors.white),
             onPressed: () => _showLeaderboard(context),
@@ -85,8 +87,70 @@ class HomeScreen extends StatelessWidget {
       ),
       const SizedBox(height: 20),
       const Text('Train Your Brain',
-          style: const TextStyle(fontSize: 16, color: Colors.white70, letterSpacing: 1)),
+          style: TextStyle(fontSize: 16, color: Colors.white70, letterSpacing: 1)),
     ]);
+  }
+
+  /// Shows current AI key status and a connect/change button.
+  Widget _buildAIStatus(BuildContext context) {
+    return Consumer<GameProvider>(
+      builder: (context, gp, _) {
+        final hasKey = gp.hasAIKey;
+        return GestureDetector(
+          onTap: () => showDialog(
+            context: context,
+            builder: (_) => const APIKeyDialog(),
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: hasKey
+                    ? [Colors.green.withValues(alpha: 0.25), Colors.teal.withValues(alpha: 0.15)]
+                    : [Colors.grey.withValues(alpha: 0.15), Colors.blueGrey.withValues(alpha: 0.1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasKey ? Colors.greenAccent : Colors.white24,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  hasKey ? Icons.smart_toy : Icons.smart_toy_outlined,
+                  color: hasKey ? Colors.greenAccent : Colors.white38,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    hasKey
+                        ? '✅ AI Coach connected — tap to change'
+                        : '🔑 Connect AI for post-game insights',
+                    style: TextStyle(
+                      color: hasKey ? Colors.greenAccent : Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 13,
+                  color: hasKey ? Colors.greenAccent.withValues(alpha: 0.7) : Colors.white24,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildGameModes(BuildContext context) {
@@ -150,39 +214,82 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildMultiplayerButton(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const MultiplayerScreen())),
-      icon: const Icon(Icons.people),
-      label: const Text('PLAY MULTIPLAYER'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.orange,
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const MultiplayerScreen())),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            Colors.purple.withValues(alpha: 0.3), Colors.indigo.withValues(alpha: 0.2)
+          ]),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.purple, width: 2),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people, color: Colors.purple),
+            SizedBox(width: 10),
+            Text('MULTIPLAYER', style: TextStyle(
+                color: Colors.purple, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAnalysisButton(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AnalysisScreen())),
-      icon: const Icon(Icons.analytics),
-      label: const Text('VIEW ANALYSIS'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.cyan,
-        side: const BorderSide(color: Colors.cyan),
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const AnalysisScreen())),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            Colors.cyan.withValues(alpha: 0.3), Colors.blue.withValues(alpha: 0.2)
+          ]),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.cyan, width: 2),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.analytics, color: Colors.cyan),
+            SizedBox(width: 10),
+            Text('PERFORMANCE ANALYSIS', style: TextStyle(
+                color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSettingsButton(BuildContext context) {
-    return TextButton.icon(
-      onPressed: () => _showSettingsDialog(context),
-      icon: const Icon(Icons.settings, color: Colors.white54),
-      label: const Text('Game Settings', style: TextStyle(color: Colors.white54)),
+    return GestureDetector(
+      onTap: () => _showSettingsDialog(context),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            Colors.blueGrey.withValues(alpha: 0.3), Colors.grey.withValues(alpha: 0.2)
+          ]),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.blueGrey, width: 2),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.settings, color: Colors.blueGrey),
+            SizedBox(width: 10),
+            Text('SETTINGS', style: TextStyle(
+                color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -282,7 +389,7 @@ class HomeScreen extends StatelessWidget {
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           const Text('Scores will appear here after completed games.',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(color: Colors.white54, fontSize: 12),
               textAlign: TextAlign.center),
           const SizedBox(height: 16),
           ...List.generate(5, (i) => Container(
@@ -303,7 +410,7 @@ class HomeScreen extends StatelessWidget {
         ]),
         actions: [TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('CLOSE', style: const TextStyle(color: Colors.cyan)),
+          child: const Text('CLOSE', style: TextStyle(color: Colors.cyan)),
         )],
       ),
     );
@@ -337,6 +444,66 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         _toggle('Sound Effects', Icons.volume_up, _sound, (v) => setState(() => _sound = v)),
         _toggle('Background Music', Icons.music_note, _music, (v) => setState(() => _music = v)),
         _toggle('Show AI Hints', Icons.psychology, _hints, (v) => setState(() => _hints = v)),
+        const SizedBox(height: 16),
+        // ── AI API Key section ─────────────────────────────────────────────
+        const Divider(color: Colors.white12),
+        const SizedBox(height: 8),
+        Consumer<GameProvider>(
+          builder: (context, gp, _) {
+            final hasKey = gp.hasAIKey;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.smart_toy,
+                      color: hasKey ? Colors.greenAccent : Colors.white38,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        hasKey ? 'AI: Connected' : 'AI: Not connected',
+                        style: TextStyle(
+                          color: hasKey ? Colors.greenAccent : Colors.white54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context); // close settings first
+                      showDialog(
+                        context: context,
+                        builder: (_) => const APIKeyDialog(),
+                      );
+                    },
+                    icon: Icon(
+                      hasKey ? Icons.edit : Icons.key,
+                      size: 16,
+                      color: Colors.cyan,
+                    ),
+                    label: Text(
+                      hasKey ? 'Change API Key' : 'Connect AI API Key',
+                      style: const TextStyle(color: Colors.cyan, fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.cyan),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(10),

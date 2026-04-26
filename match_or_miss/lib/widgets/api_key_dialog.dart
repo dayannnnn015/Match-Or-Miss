@@ -14,71 +14,139 @@ class APIKeyDialog extends StatefulWidget {
 
 class _APIKeyDialogState extends State<APIKeyDialog> {
   String _apiKey = '';
-  AIProviderType _selectedProvider = AIProviderType.anthropic; // default to Claude
+  AIProviderType _selectedProvider = AIProviderType.anthropic;
   bool _showKey = false;
+  bool _isSaving = false;
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: const Color(0xFF1a1a2e),
       child: Container(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header ──────────────────────────────────────────────────
             const Row(
               children: [
-                Icon(Icons.psychology, color: Colors.cyan, size: 30),
+                Icon(Icons.smart_toy, color: Colors.cyanAccent, size: 28),
                 SizedBox(width: 10),
                 Text(
-                  'Connect AI Assistant',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  'Connect AI',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             const Text(
-              'Unlock real AI insights after each game.',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+              'Unlock personalized AI insights after every game.',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
             ),
             const SizedBox(height: 20),
-            const Text('Choose AI Provider:'),
+
+            // ── Provider selector ────────────────────────────────────────
+            const Text('Choose AI Provider:', style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 10),
             _buildProviderSelector(),
             const SizedBox(height: 20),
-            const Text('API Key:'),
+
+            // ── API Key field ────────────────────────────────────────────
+            const Text('API Key:', style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 10),
             TextField(
               obscureText: !_showKey,
+              style: const TextStyle(color: Colors.white),
               onChanged: (value) => _apiKey = value,
               decoration: InputDecoration(
                 hintText: 'Paste your API key here',
-                border: const OutlineInputBorder(),
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.07),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.cyanAccent, width: 2),
+                ),
                 suffixIcon: IconButton(
-                  icon: Icon(_showKey ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(_showKey ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.white38),
                   onPressed: () => setState(() => _showKey = !_showKey),
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              _getProviderHint(),
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            Row(
+              children: [
+                const Icon(Icons.link, color: Colors.white24, size: 13),
+                const SizedBox(width: 6),
+                Text(
+                  _getProviderHint(),
+                  style: const TextStyle(fontSize: 11, color: Colors.white38),
+                ),
+              ],
+            ),
+
+            // ── What AI does ─────────────────────────────────────────────
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.2)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('🤖 What the AI does after each game:',
+                      style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 6),
+                  Text('• Analyzes your move patterns & decision-making',
+                      style: TextStyle(color: Colors.white54, fontSize: 11)),
+                  Text('• Identifies impulsive vs. methodical thinking',
+                      style: TextStyle(color: Colors.white54, fontSize: 11)),
+                  Text('• Gives personalized tips to improve your score',
+                      style: TextStyle(color: Colors.white54, fontSize: 11)),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
+
+            // ── Actions ──────────────────────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: _apiKey.trim().isNotEmpty ? () => _connectAI(context) : null,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  child: const Text('Connect'),
+                ElevatedButton.icon(
+                  onPressed: (_apiKey.trim().isNotEmpty && !_isSaving)
+                      ? () => _connectAI(context)
+                      : null,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.black)))
+                      : const Icon(Icons.check, size: 18),
+                  label: Text(_isSaving ? 'Connecting…' : 'Connect'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyanAccent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ],
             ),
@@ -92,8 +160,9 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
-        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white12),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.03),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -111,20 +180,21 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
     final isSelected = _selectedProvider == provider;
     return GestureDetector(
       onTap: () => setState(() => _selectedProvider = provider),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.cyan.withValues(alpha: 0.2) : Colors.transparent,
+          color: isSelected ? Colors.cyanAccent.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: isSelected ? Border.all(color: Colors.cyan) : null,
+          border: isSelected ? Border.all(color: Colors.cyanAccent, width: 1.5) : null,
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? Colors.cyan : Colors.grey),
+            Icon(icon, color: isSelected ? Colors.cyanAccent : Colors.white38, size: 22),
             const SizedBox(height: 4),
             Text(label,
                 style: TextStyle(
-                    color: isSelected ? Colors.cyan : Colors.grey, fontSize: 12)),
+                    color: isSelected ? Colors.cyanAccent : Colors.white38, fontSize: 11)),
           ],
         ),
       ),
@@ -134,17 +204,16 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
   String _getProviderHint() {
     switch (_selectedProvider) {
       case AIProviderType.anthropic:
-        return 'Get your key at: console.anthropic.com';
+        return 'console.anthropic.com';
       case AIProviderType.openAI:
-        return 'Get your key at: platform.openai.com/api-keys';
+        return 'platform.openai.com/api-keys';
       case AIProviderType.googleGemini:
-        return 'Get your key at: aistudio.google.com/app/apikey';
+        return 'aistudio.google.com/app/apikey';
       case AIProviderType.customAPI:
-        return 'Enter your custom backend API endpoint URL';
+        return 'Your custom backend URL';
     }
   }
 
-  /// Maps the UI enum to the service-layer enum
   ai_svc.AIProvider _mapToServiceProvider(AIProviderType p) {
     switch (p) {
       case AIProviderType.anthropic:    return ai_svc.AIProvider.anthropic;
@@ -154,22 +223,37 @@ class _APIKeyDialogState extends State<APIKeyDialog> {
     }
   }
 
-  void _connectAI(BuildContext context) {
+  Future<void> _connectAI(BuildContext context) async {
+    setState(() => _isSaving = true);
+
     final key = _apiKey.trim();
     final serviceProvider = _mapToServiceProvider(_selectedProvider);
 
-    // 1. Wire into AIProvider (used by hints / analysis screens)
+    // 1. Wire into AIProvider (hints / analysis screens)
     final aiProvider = Provider.of<AIProvider>(context, listen: false);
     aiProvider.enableAI(key, provider: _selectedProvider);
 
-    // 2. Wire into GameProvider (used by post-game insight in result dialog)
+    // 2. Wire into GameProvider AND persist to secure storage so the key
+    //    survives app restarts — no need to re-enter on every launch.
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    gameProvider.setAIApiKey(key, provider: serviceProvider);
+    await gameProvider.setAndSaveApiKey(key, provider: serviceProvider);
+
+    if (!mounted) return;
+
+    setState(() => _isSaving = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${_selectedProvider.name} connected — AI insights enabled!'),
-        backgroundColor: Colors.green,
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            Text('${_selectedProvider.name} AI connected! Key saved permanently.'),
+          ],
+        ),
+        backgroundColor: Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
       ),
     );
 
