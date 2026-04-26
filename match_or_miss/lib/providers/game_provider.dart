@@ -1,4 +1,5 @@
 // lib/providers/game_provider.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
 import '../utils/constants.dart';
@@ -9,69 +10,66 @@ import '../services/secure_storage_service.dart';
 
 class GameProvider extends ChangeNotifier {
   final GameService _gameService = GameService();
-  final AIService _aiService = AIService();
+  final AIService   _aiService   = AIService();
   final ai_svc.OpenAIService _openAIService = ai_svc.OpenAIService();
 
   GameSession? _currentSession;
-  List<Color> _currentGuess = [];
-  bool _isSubmitting = false;
-  bool _showHistory = true;
+  List<Color>  _currentGuess = [];
+  bool _isSubmitting  = false;
+  bool _showHistory   = true;
   List<Color> _previousGuess = [];
 
-  String _postGameInsight = '';
-  bool _isLoadingInsight = false;
+  String _postGameInsight  = '';
+  bool   _isLoadingInsight = false;
   String _lastHint = '';
 
-  bool get hasHint => _lastHint.isNotEmpty;
-  String get lastHint => _lastHint;
-  String get postGameInsight => _postGameInsight;
-  bool get isLoadingInsight => _isLoadingInsight;
-  bool get hasAIKey => _openAIService.hasValidKey;
+  // ── Inhibitory Control state ────────────────────────────────────────────────
+  /// Timestamp when the player last changed their guess.
+  DateTime? _lastGuessChangeTime;
+  int _patienceBonusEarned = 0; // accumulated across all moves this session
+
+  // ── Cognitive Flexibility state ─────────────────────────────────────────────
+  bool _sequenceShifted    = false;
+  bool _shiftAlertPending  = false; // true for one frame so the UI can flash
+  bool _solvedAfterShift   = false;
+
+  // Expose for UI
+  bool get sequenceJustShifted => _shiftAlertPending;
+  bool get sequenceHasShifted  => _sequenceShifted;
+
+  // ── Standard getters ────────────────────────────────────────────────────────
+  bool   get hasHint          => _lastHint.isNotEmpty;
+  String get lastHint         => _lastHint;
+  String get postGameInsight  => _postGameInsight;
+  bool   get isLoadingInsight => _isLoadingInsight;
+  bool   get hasAIKey         => _openAIService.hasValidKey;
 
   GameSession? get currentSession => _currentSession;
-  List<Color> get currentGuess => _currentGuess;
-  bool get isSubmitting => _isSubmitting;
-  bool get showHistory => _showHistory;
+  List<Color>  get currentGuess   => _currentGuess;
+  bool         get isSubmitting   => _isSubmitting;
+  bool         get showHistory    => _showHistory;
 
   bool get canSubmit {
     if (_currentGuess.isEmpty) return false;
     return _gameService.isValidGuess(_currentGuess);
   }
 
-  GameProvider() {
-    _loadApiKey();
-  }
+  // ── Constructor ──────────────────────────────────────────────────────────────
+  GameProvider() { _loadApiKey(); }
 
-  /// On startup: try loading key in this order:
-  /// 1. Previously saved key in secure storage (persists across launches)
-  /// 2. Key baked in at build time via --dart-define (first-run seed)
-  ///
-  /// This means:
-  /// - First build: key comes from --dart-define, gets saved to secure storage
-  /// - Every launch after: key loads from secure storage automatically
-  /// - No user action ever needed
   Future<void> _loadApiKey() async {
-    // 1. Try secure storage first (fastest path after first launch)
-    String? storedKey = await SecureStorageService.getAPIKey('gemini');
-
-    if (storedKey != null && storedKey.isNotEmpty) {
-      _openAIService.setApiKey(storedKey, provider: ai_svc.AIProvider.googleGemini);
-      return;
+    // Key is baked in at build time via --dart-define-from-file=env.json
+    // env.json lives on your machine only and is never committed to git
+    // Players never see or interact with this key
+    const key = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+    if (key.isNotEmpty) {
+      _openAIService.setApiKey(key, provider: ai_svc.AIProvider.googleGemini);
+      print('🤖 Gemini AI ready');
+    } else {
+      print('⚠️ No AI key found — using local fallback. Run with --dart-define-from-file=env.json');
     }
-
-    // 2. Fall back to build-time key, and save it for future launches
-    const buildTimeKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-    if (buildTimeKey.isNotEmpty) {
-      _openAIService.setApiKey(buildTimeKey, provider: ai_svc.AIProvider.googleGemini);
-      // Save so future launches don't need --dart-define
-      await SecureStorageService.saveAPIKey('gemini', buildTimeKey);
-    }
-
-    // 3. No key found — local fallback will be used silently
   }
 
-  /// Lets you update the key at runtime (e.g. from a dev settings screen)
-  /// Saves to secure storage so it persists after the app restarts.
   Future<void> setAndSaveApiKey(String apiKey,
       {ai_svc.AIProvider provider = ai_svc.AIProvider.googleGemini}) async {
     _openAIService.setApiKey(apiKey, provider: provider);
@@ -79,14 +77,13 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Keep for backward compatibility with api_key_dialog
   void setAIApiKey(String apiKey,
       {ai_svc.AIProvider provider = ai_svc.AIProvider.googleGemini}) {
     _openAIService.setApiKey(apiKey, provider: provider);
     notifyListeners();
   }
 
-  // ─── Game lifecycle ────────────────────────────────────────────────────────
+  // ── Game lifecycle ────────────────────────────────────────────────────────────
 
   void initializeGame(GameMode mode) {
     final hidden = _gameService.generateHiddenSequence();
@@ -98,36 +95,43 @@ class GameProvider extends ChangeNotifier {
       startTime: DateTime.now(),
       hiddenSequence: hidden,
     );
-    _currentGuess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
-    _previousGuess = List.from(_currentGuess);
-    _isSubmitting = false;
-    _lastHint = '';
-    _postGameInsight = '';
-    _isLoadingInsight = false;
+    _currentGuess       = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
+    _previousGuess      = List.from(_currentGuess);
+    _isSubmitting       = false;
+    _lastHint           = '';
+    _postGameInsight    = '';
+    _isLoadingInsight   = false;
+    _lastGuessChangeTime = null;
+    _patienceBonusEarned = 0;
+    _sequenceShifted    = false;
+    _shiftAlertPending  = false;
+    _solvedAfterShift   = false;
     notifyListeners();
   }
 
   int _getTimeLimit(GameMode mode) {
     switch (mode) {
-      case GameMode.quick:       return AppConstants.quickModeTime;
-      case GameMode.standard:    return AppConstants.standardModeTime;
-      case GameMode.competitive: return AppConstants.competitiveModeTime;
+      case GameMode.quick:       return AppConstants.workingMemoryModeTime;
+      case GameMode.standard:    return AppConstants.inhibitoryModeTime;
+      case GameMode.competitive: return AppConstants.flexibilityModeTime;
     }
   }
 
   int _getMaxMoves(GameMode mode) {
     switch (mode) {
-      case GameMode.quick:       return AppConstants.quickModeMaxMoves;
-      case GameMode.standard:    return AppConstants.standardModeMaxMoves;
-      case GameMode.competitive: return AppConstants.competitiveModeMaxMoves;
+      case GameMode.quick:       return AppConstants.workingMemoryModeMaxMoves;
+      case GameMode.standard:    return AppConstants.inhibitoryModeMaxMoves;
+      case GameMode.competitive: return AppConstants.flexibilityModeMaxMoves;
     }
   }
 
-  // ─── Guess handling ────────────────────────────────────────────────────────
+  // ── Guess handling ────────────────────────────────────────────────────────────
 
   void updateGuess(int index, Color color) {
     if (_isSubmitting) return;
     _currentGuess[index] = color;
+    // Record the time of the last change — used by inhibitory mode patience check
+    _lastGuessChangeTime = DateTime.now();
     notifyListeners();
   }
 
@@ -136,6 +140,7 @@ class GameProvider extends ChangeNotifier {
     final temp = _currentGuess[index1];
     _currentGuess[index1] = _currentGuess[index2];
     _currentGuess[index2] = temp;
+    _lastGuessChangeTime = DateTime.now();
     notifyListeners();
   }
 
@@ -143,58 +148,92 @@ class GameProvider extends ChangeNotifier {
     if (_isSubmitting || _currentSession == null) return;
     if (!canSubmit) return;
 
-    _isSubmitting = true;
-    _lastHint = '';
+    _isSubmitting     = true;
+    _shiftAlertPending = false;
+    _lastHint         = '';
     notifyListeners();
 
     await Future.delayed(const Duration(milliseconds: 300));
 
+    final session = _currentSession!;
+    final mode    = session.mode;
+
+    // ── Inhibitory Control: check patience ────────────────────────────────────
+    int patienceThisTurn = 0;
+    if (mode == GameMode.standard && _lastGuessChangeTime != null) {
+      final waited = DateTime.now().difference(_lastGuessChangeTime!).inSeconds;
+      if (waited >= AppConstants.inhibitoryPatientSecs) {
+        patienceThisTurn = 1;
+        _patienceBonusEarned++;
+      }
+    }
+
+    // ── Score the attempt ─────────────────────────────────────────────────────
     final variablesChanged = _gameService.calculateVariablesChanged(
       _previousGuess.every((c) => c == Colors.grey) ? _currentGuess : _previousGuess,
       _currentGuess,
     );
-    final matches = _gameService.calculateMatches(
-        _currentGuess, _currentSession!.hiddenSequence);
-    final matchedPositions = _gameService.getMatchedPositions(
-        _currentGuess, _currentSession!.hiddenSequence);
-    final prevMatches = _currentSession!.attempts.isNotEmpty
-        ? _currentSession!.attempts.last.matches
-        : 0;
-    final isImpulsive =
-        _gameService.isImpulsiveMove(variablesChanged, prevMatches, matches);
+    final matches         = _gameService.calculateMatches(_currentGuess, session.hiddenSequence);
+    final matchedPositions= _gameService.getMatchedPositions(_currentGuess, session.hiddenSequence);
+    final prevMatches     = session.attempts.isNotEmpty ? session.attempts.last.matches : 0;
+    final isImpulsive     = _gameService.isImpulsiveMove(variablesChanged, prevMatches, matches);
 
     final attempt = Attempt(
-      attemptNumber: _currentSession!.currentMoves + 1,
-      guess: List.from(_currentGuess),
-      matches: matches,
+      attemptNumber:    session.currentMoves + 1,
+      guess:            List.from(_currentGuess),
+      matches:          matches,
       matchedPositions: matchedPositions,
-      timestamp: DateTime.now(),
+      timestamp:        DateTime.now(),
       variablesChanged: variablesChanged,
-      wasImpulsive: isImpulsive,
+      wasImpulsive:     isImpulsive,
+      patienceBonus:    patienceThisTurn,
     );
 
-    _currentSession!.attempts.add(attempt);
-    _currentSession!.currentMoves++;
-    _previousGuess = List.from(_currentGuess);
+    session.attempts.add(attempt);
+    session.currentMoves++;
+    _previousGuess       = List.from(_currentGuess);
+    _lastGuessChangeTime = null; // reset after each submit
 
-    // Local hint — instant, no network
-    _lastHint = _aiService.getRealTimeHint(attempt, _currentSession!.currentMoves);
+    // ── Local AI hint ─────────────────────────────────────────────────────────
+    _lastHint = _aiService.getRealTimeHint(attempt, session.currentMoves);
 
-    if (_gameService.isSequenceSolved(_currentGuess, _currentSession!.hiddenSequence)) {
+    // ── Cognitive Flexibility: shift after move N ─────────────────────────────
+    if (mode == GameMode.competitive &&
+        !_sequenceShifted &&
+        session.currentMoves >= AppConstants.flexibilityShiftAfterMove) {
+      session.hiddenSequence = _gameService.shiftSequence(session.hiddenSequence);
+      _sequenceShifted   = true;
+      _shiftAlertPending = true;
+    }
+
+    // ── Update score on solve ─────────────────────────────────────────────────
+    final solved = _gameService.isSequenceSolved(_currentGuess, session.hiddenSequence);
+    if (solved) {
+      if (_sequenceShifted) _solvedAfterShift = true;
       final score = _gameService.calculateScore(
         matches,
-        _currentSession!.currentMoves,
-        _currentSession!.remainingTime,
-        mode: _currentSession!.mode,
+        session.currentMoves,
+        session.remainingTime,
+        mode: mode,
+        attempts: session.attempts,
+        patienceBonusEarned: _patienceBonusEarned,
+        solvedAfterShift: _solvedAfterShift,
       );
-      _currentSession!.currentScore += score;
+      session.currentScore += score;
     }
 
     _isSubmitting = false;
     notifyListeners();
+
+    // Clear the shift alert after one notification cycle
+    if (_shiftAlertPending) {
+      await Future.delayed(const Duration(milliseconds: 50));
+      _shiftAlertPending = false;
+      notifyListeners();
+    }
   }
 
-  // ─── Post-game AI insight ──────────────────────────────────────────────────
+  // ── Post-game insight ─────────────────────────────────────────────────────────
 
   void loadPostGameInsight() {
     final session = _currentSession;
@@ -203,19 +242,14 @@ class GameProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-
-    // Step 1: show local insight immediately — dialog is never empty
     _postGameInsight = _buildLocalInsight();
     notifyListeners();
 
-    // Step 2: upgrade to real AI in background if key is available
     if (_openAIService.hasValidKey) {
       _isLoadingInsight = true;
       notifyListeners();
-
-      print('🤖 AI key found — calling Gemini for post-game insight...');
+      print('🤖 Calling Gemini for post-game insight...');
       final timeSpent = DateTime.now().difference(session.startTime).inSeconds;
-
       _openAIService
           .getGameCompletionFeedback(
             attempts: session.attempts,
@@ -224,75 +258,82 @@ class GameProvider extends ChangeNotifier {
             timeSpent: timeSpent,
           )
           .then((aiInsight) {
-            print('✅ Gemini responded: ${aiInsight.substring(0, aiInsight.length.clamp(0, 80))}...');
+            print('✅ Gemini responded successfully');
             if (aiInsight.isNotEmpty) _postGameInsight = aiInsight;
             _isLoadingInsight = false;
             notifyListeners();
           })
           .catchError((e) {
-            print('❌ AI insight failed, using local fallback: $e');
+            print('❌ Gemini call failed: \$e');
             _isLoadingInsight = false;
             notifyListeners();
           });
     }
   }
 
-  // ─── Local fallback ────────────────────────────────────────────────────────
-
   String _buildLocalInsight() {
     final session = _currentSession;
     if (session == null || session.attempts.isEmpty) return '';
 
-    final attempts = session.attempts;
-    final best = attempts.reduce((a, b) => a.matches > b.matches ? a : b);
-    final avgChanged = attempts
-            .map((a) => a.variablesChanged.toDouble())
-            .reduce((a, b) => a + b) /
-        attempts.length;
-    final impulsive = attempts.where((a) => a.wasImpulsive).length;
+    final attempts   = session.attempts;
+    final best       = attempts.reduce((a, b) => a.matches > b.matches ? a : b);
+    final methodical = attempts.where((a) => a.variablesChanged <= 2).length;
+    final impulsive  = attempts.where((a) => a.wasImpulsive).length;
+    final avgChanged = attempts.map((a) => a.variablesChanged.toDouble())
+            .reduce((a, b) => a + b) / attempts.length;
     final won = attempts.last.matches == GameService.SEQUENCE_LENGTH;
 
     final buf = StringBuffer();
     if (won) {
-      buf.writeln('🎉 Puzzle solved in ${session.currentMoves} moves!');
+      buf.writeln('🎉 Solved in ${session.currentMoves} moves!');
     } else {
-      buf.writeln('You reached ${attempts.last.matches}/8 matches.');
+      buf.writeln('Best: ${attempts.last.matches}/8 matches.');
     }
-    buf.writeln('Best move: Move ${best.attemptNumber} with ${best.matches}/8.');
-    buf.writeln('Avg bottles swapped per move: ${avgChanged.toStringAsFixed(1)}.');
+    buf.writeln('Best move: #${best.attemptNumber} with ${best.matches}/8.');
+    buf.writeln('Methodical moves (≤2 changes): $methodical — earned ${methodical * AppConstants.strategyBonusPerMove} bonus pts.');
     if (impulsive > 0) {
-      buf.writeln('$impulsive impulsive move(s) — try changing fewer bottles at a time.');
+      buf.writeln('Impulsive moves: $impulsive — lost ${impulsive * AppConstants.impulsivePenaltyPerMove} pts.');
     } else {
-      buf.writeln('No impulsive moves — great discipline!');
+      buf.writeln('No impulsive moves — full strategy bonus!');
+    }
+    if (session.mode == GameMode.standard && _patienceBonusEarned > 0) {
+      buf.writeln('Patience bonuses earned: $_patienceBonusEarned × ${AppConstants.inhibitoryPatienceBonus} pts.');
+    }
+    if (session.mode == GameMode.competitive && _sequenceShifted) {
+      buf.writeln(_solvedAfterShift
+          ? '🔄 You adapted after the mid-game shift — +200 flexibility bonus!'
+          : '🔄 The puzzle shifted mid-game. Adaptation is key next time.');
     }
     buf.write(avgChanged > 2.5
-        ? 'Tip: Swap 1–2 bottles per move for cleaner feedback.'
-        : 'Tip: Keep isolating one variable at a time — you\'re on the right track.');
+        ? 'Tip: Swap 1–2 bottles per move for cleaner deduction.'
+        : 'Tip: Keep isolating one variable at a time — good discipline.');
     return buf.toString();
   }
 
   String buildPostGameAnalysis() => _buildLocalInsight();
 
-  // ─── Misc ──────────────────────────────────────────────────────────────────
+  // ── Misc ──────────────────────────────────────────────────────────────────────
 
-  void toggleHistory() {
-    _showHistory = !_showHistory;
-    notifyListeners();
-  }
+  void toggleHistory() { _showHistory = !_showHistory; notifyListeners(); }
 
   void resetGuess() {
     _currentGuess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
     _lastHint = '';
+    _lastGuessChangeTime = null;
     notifyListeners();
   }
 
   void resetGame() {
-    _currentSession = null;
-    _currentGuess = [];
-    _isSubmitting = false;
-    _lastHint = '';
-    _postGameInsight = '';
-    _isLoadingInsight = false;
+    _currentSession      = null;
+    _currentGuess        = [];
+    _isSubmitting        = false;
+    _lastHint            = '';
+    _postGameInsight     = '';
+    _isLoadingInsight    = false;
+    _patienceBonusEarned = 0;
+    _sequenceShifted     = false;
+    _shiftAlertPending   = false;
+    _solvedAfterShift    = false;
     notifyListeners();
   }
 

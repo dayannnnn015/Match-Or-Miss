@@ -248,8 +248,8 @@ class _ActiveGame extends StatefulWidget {
 
 class _ActiveGameState extends State<_ActiveGame> {
   // Multiplayer uses Standard pacing — fair for both players on the same device
-  static const _maxMoves = AppConstants.standardModeMaxMoves; // 10
-  static const _timeLimit = AppConstants.standardModeTime;    // 240s = 4 min
+  static const _maxMoves = AppConstants.inhibitoryModeMaxMoves; // 12
+  static const _timeLimit = AppConstants.inhibitoryModeTime;  // 300s = 5 min
 
   final _gs = GameService();
   final _ai = AIService();
@@ -431,7 +431,7 @@ class _ActiveGameState extends State<_ActiveGame> {
               if (widget.mode == _MPMode.race)
                 _chip('⏱ ${_secs ~/ 60}:${(_secs % 60).toString().padLeft(2, "0")}', widget.color)
               else
-                _chip('$_moves / $_maxMoves moves', Colors.white54),
+                _buildCountdown(),
             ]),
           ),
 
@@ -698,7 +698,7 @@ class _HandoffScreen extends StatelessWidget {
                 _stat('MOVES', '${r1.moves}', Colors.cyan),
                 if (mode == _MPMode.race)
                   _stat('TIME', '${r1.secs}s', Colors.orange),
-                _stat('BEST', '${r1.bestMatch}/8', Colors.white70),
+                _stat('BEST', '${r1.bestMatch}/${GameService.SEQUENCE_LENGTH}', Colors.white70),
               ]),
             ]),
           ),
