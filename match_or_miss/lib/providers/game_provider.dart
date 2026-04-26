@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import '../models/game_models.dart';
 import '../utils/constants.dart';
 import '../services/game_service.dart';
-import '../services/ai_service.dart';
 import '../services/openai_service.dart' as ai_svc;
 import '../services/secure_storage_service.dart';
 
 class GameProvider extends ChangeNotifier {
   final GameService _gameService = GameService();
+<<<<<<< HEAD
   final AIService   _aiService   = AIService();
   final ai_svc.OpenAIService _openAIService = ai_svc.OpenAIService();
 
@@ -48,14 +48,39 @@ class GameProvider extends ChangeNotifier {
   List<Color>  get currentGuess   => _currentGuess;
   bool         get isSubmitting   => _isSubmitting;
   bool         get showHistory    => _showHistory;
+=======
+  final ai_svc.OpenAIService _openAIService = ai_svc.OpenAIService();
 
-  bool get canSubmit {
-    if (_currentGuess.isEmpty) return false;
-    return _gameService.isValidGuess(_currentGuess);
-  }
+  GameSession? _currentSession;
+  List<Bottle?> _currentGuessSlots = [];
+  List<Bottle?> _previousGuessSlots = []; // Track previous state for attempt recording
+  bool _isSubmitting = false;
+  bool _resultDialogShown = false; // Track whether result dialog has been shown
 
+  String _postGameInsight = '';
+  bool _isLoadingInsight = false;
+
+  String get postGameInsight => _postGameInsight;
+  bool get isLoadingInsight => _isLoadingInsight;
+  bool get hasAIKey => _openAIService.hasValidKey;
+
+  GameSession? get currentSession => _currentSession;
+  List<Bottle?> get currentGuessSlots => _currentGuessSlots;
+  bool get isSubmitting => _isSubmitting;
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
+
+  bool get canSubmit => false; // No submit button needed
+
+<<<<<<< HEAD
   // ── Constructor ──────────────────────────────────────────────────────────────
   GameProvider() { _loadApiKey(); }
+=======
+  GameProvider() {
+    _loadApiKey();
+    // Default to Gemini - users can change in settings if needed
+    _openAIService.setApiKey('', provider: ai_svc.AIProvider.googleGemini);
+  }
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
 
   Future<void> _loadApiKey() async {
     // Key is baked in at build time via --dart-define-from-file=env.json
@@ -85,16 +110,25 @@ class GameProvider extends ChangeNotifier {
 
   // ── Game lifecycle ────────────────────────────────────────────────────────────
 
-  void initializeGame(GameMode mode) {
+  void initializeGame(GameMode mode, {int? customMaxMoves}) {
     final hidden = _gameService.generateHiddenSequence();
+    // Shuffle bottles so puzzle starts unsolved
+    final shuffledBottles = _gameService.generateAvailableBottles(hidden);
+    
+    final maxMoves = customMaxMoves ?? _getMaxMoves(mode);
+    final timeLimit = _getTimeLimit(mode);
+    
     _currentSession = GameSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       mode: mode,
-      timeLimit: _getTimeLimit(mode),
-      maxMoves: _getMaxMoves(mode),
+      timeLimit: timeLimit,
+      maxMoves: maxMoves,
       startTime: DateTime.now(),
       hiddenSequence: hidden,
+      currentGuessSlots: shuffledBottles.cast<Bottle?>(),
+      availableBottles: [],
     );
+<<<<<<< HEAD
     _currentGuess       = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
     _previousGuess      = List.from(_currentGuess);
     _isSubmitting       = false;
@@ -106,14 +140,28 @@ class GameProvider extends ChangeNotifier {
     _sequenceShifted    = false;
     _shiftAlertPending  = false;
     _solvedAfterShift   = false;
+=======
+    _currentGuessSlots = shuffledBottles.cast<Bottle?>();
+    _previousGuessSlots = shuffledBottles.cast<Bottle?>(); // Initialize previous state
+    _isSubmitting = false;
+    _resultDialogShown = false; // Reset result dialog flag for new game
+    _postGameInsight = '';
+    _isLoadingInsight = false;
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
     notifyListeners();
   }
 
   int _getTimeLimit(GameMode mode) {
     switch (mode) {
+<<<<<<< HEAD
       case GameMode.quick:       return AppConstants.workingMemoryModeTime;
       case GameMode.standard:    return AppConstants.inhibitoryModeTime;
       case GameMode.competitive: return AppConstants.flexibilityModeTime;
+=======
+      case GameMode.quick:       return 999999; // Essentially unlimited for quick mode
+      case GameMode.standard:    return AppConstants.standardModeTime;
+      case GameMode.competitive: return AppConstants.competitiveModeTime;
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
     }
   }
 
@@ -127,6 +175,7 @@ class GameProvider extends ChangeNotifier {
 
   // ── Guess handling ────────────────────────────────────────────────────────────
 
+<<<<<<< HEAD
   void updateGuess(int index, Color color) {
     if (_isSubmitting) return;
     _currentGuess[index] = color;
@@ -182,9 +231,43 @@ class GameProvider extends ChangeNotifier {
       attemptNumber:    session.currentMoves + 1,
       guess:            List.from(_currentGuess),
       matches:          matches,
+=======
+  void swapBottles(int index1, int index2) {
+    if (_currentSession == null) return;
+    
+    // Step 1: Record state before swap
+    final previousMatches = _gameService.calculateMatches(
+        _currentGuessSlots, _currentSession!.hiddenSequence);
+    
+    // Step 2: Perform the swap
+    final temp = _currentGuessSlots[index1];
+    _currentGuessSlots[index1] = _currentGuessSlots[index2];
+    _currentGuessSlots[index2] = temp;
+    
+    // Step 3: Calculate new state after swap
+    final currentMatches = _gameService.calculateMatches(
+        _currentGuessSlots, _currentSession!.hiddenSequence);
+    final matchedPositions = _gameService.getMatchedPositions(
+        _currentGuessSlots, _currentSession!.hiddenSequence);
+    
+    // Step 4: Calculate variables changed
+    final variablesChanged = _gameService.calculateVariablesChanged(
+        _previousGuessSlots, _currentGuessSlots);
+    
+    // Step 5: Detect impulsive move
+    final wasImpulsive = _gameService.isImpulsiveMove(
+        variablesChanged, previousMatches, currentMatches);
+    
+    // Step 6: Create attempt record
+    final attempt = Attempt(
+      attemptNumber: _currentSession!.attempts.length + 1,
+      guess: List<Bottle?>.from(_currentGuessSlots),
+      matches: currentMatches,
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
       matchedPositions: matchedPositions,
       timestamp:        DateTime.now(),
       variablesChanged: variablesChanged,
+<<<<<<< HEAD
       wasImpulsive:     isImpulsive,
       patienceBonus:    patienceThisTurn,
     );
@@ -231,6 +314,56 @@ class GameProvider extends ChangeNotifier {
       _shiftAlertPending = false;
       notifyListeners();
     }
+=======
+      wasImpulsive: wasImpulsive,
+    );
+    
+    // Step 7: Record attempt in session
+    _currentSession!.attempts.add(attempt);
+    
+    // Step 8: Update previous state for next move
+    _previousGuessSlots = List<Bottle?>.from(_currentGuessSlots);
+    
+    // Step 9: Count moves
+    _currentSession!.currentMoves++;
+    notifyListeners();
+  }
+  
+  /// Get current matches and matched positions
+  int getCurrentMatches() {
+    if (_currentSession == null) return 0;
+    return _gameService.calculateMatches(
+        _currentGuessSlots, _currentSession!.hiddenSequence);
+  }
+  
+  List<int> getCurrentMatchedPositions() {
+    if (_currentSession == null) return [];
+    return _gameService.getMatchedPositions(
+        _currentGuessSlots, _currentSession!.hiddenSequence);
+  }
+  
+  bool isSolved() {
+    if (_currentSession == null) return false;
+    return _gameService.isSequenceSolved(
+        _currentGuessSlots, _currentSession!.hiddenSequence);
+  }
+
+  /// Called periodically to check if game is won
+  void checkGameState() {
+    if (_currentSession == null) return;
+    if (isSolved() && !_resultDialogShown) {
+      _resultDialogShown = true;
+
+      final score = _gameService.calculateScore(
+        getCurrentMatches(),
+        _currentSession!.currentMoves,
+        _currentSession!.remainingTime,
+        mode: _currentSession!.mode,
+      );
+      _currentSession!.currentScore += score;
+      loadPostGameInsight();
+    }
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
   }
 
   // ── Post-game insight ─────────────────────────────────────────────────────────
@@ -238,17 +371,27 @@ class GameProvider extends ChangeNotifier {
   void loadPostGameInsight() {
     final session = _currentSession;
     if (session == null || session.attempts.isEmpty) {
-      _postGameInsight = _buildLocalInsight();
+      _postGameInsight = 'No game data to analyze.';
       notifyListeners();
       return;
     }
+<<<<<<< HEAD
     _postGameInsight = _buildLocalInsight();
     notifyListeners();
 
+=======
+
+    // Prioritize AI API feedback — only use local fallback if API unavailable
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
     if (_openAIService.hasValidKey) {
       _isLoadingInsight = true;
+      _postGameInsight = '🔄 Analyzing your performance...';
       notifyListeners();
+<<<<<<< HEAD
       print('🤖 Calling Gemini for post-game insight...');
+=======
+
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
       final timeSpent = DateTime.now().difference(session.startTime).inSeconds;
       _openAIService
           .getGameCompletionFeedback(
@@ -258,16 +401,33 @@ class GameProvider extends ChangeNotifier {
             timeSpent: timeSpent,
           )
           .then((aiInsight) {
+<<<<<<< HEAD
             print('✅ Gemini responded successfully');
             if (aiInsight.isNotEmpty) _postGameInsight = aiInsight;
+=======
+            if (aiInsight.isNotEmpty) {
+              _postGameInsight = aiInsight;
+            } else {
+              _postGameInsight = _buildLocalInsight();
+            }
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
             _isLoadingInsight = false;
             notifyListeners();
           })
           .catchError((e) {
+<<<<<<< HEAD
             print('❌ Gemini call failed: \$e');
+=======
+            // API failed — fall back to local
+            _postGameInsight = _buildLocalInsight();
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
             _isLoadingInsight = false;
             notifyListeners();
           });
+    } else {
+      // No API key — use local fallback
+      _postGameInsight = _buildLocalInsight();
+      notifyListeners();
     }
   }
 
@@ -312,6 +472,7 @@ class GameProvider extends ChangeNotifier {
 
   String buildPostGameAnalysis() => _buildLocalInsight();
 
+<<<<<<< HEAD
   // ── Misc ──────────────────────────────────────────────────────────────────────
 
   void toggleHistory() { _showHistory = !_showHistory; notifyListeners(); }
@@ -320,10 +481,21 @@ class GameProvider extends ChangeNotifier {
     _currentGuess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
     _lastHint = '';
     _lastGuessChangeTime = null;
+=======
+  void resetGuess() {
+    if (_currentSession == null) return;
+    // Reset bottles to shuffled order
+    final shuffledBottles = _gameService.generateAvailableBottles(_currentSession!.hiddenSequence);
+    _currentGuessSlots = shuffledBottles.cast<Bottle?>();
+    _previousGuessSlots = shuffledBottles.cast<Bottle?>();
+    _currentSession!.currentMoves = 0;
+    _currentSession!.attempts.clear(); // Clear recorded attempts
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
     notifyListeners();
   }
 
   void resetGame() {
+<<<<<<< HEAD
     _currentSession      = null;
     _currentGuess        = [];
     _isSubmitting        = false;
@@ -334,6 +506,16 @@ class GameProvider extends ChangeNotifier {
     _sequenceShifted     = false;
     _shiftAlertPending   = false;
     _solvedAfterShift    = false;
+=======
+    _currentSession = null;
+    _currentGuessSlots = [];
+    _previousGuessSlots = [];
+    _isSubmitting = false;
+    _resultDialogShown = false;
+    _postGameInsight = '';
+    _isLoadingInsight = false;
+
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
     notifyListeners();
   }
 

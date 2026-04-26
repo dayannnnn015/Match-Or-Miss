@@ -84,7 +84,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(colors: [Colors.orange, Color(0xFFBB5500)]),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.4),
+                    boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.4),
                         blurRadius: 20, offset: const Offset(0, 6))],
                   ),
                   child: const Center(child: Text('START MATCH',
@@ -110,7 +110,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: sel ? Colors.orange.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+          color: sel ? Colors.orange.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: sel ? Colors.orange : Colors.white24, width: sel ? 1.5 : 1),
         ),
@@ -131,12 +131,12 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
     style: TextStyle(color: color, fontWeight: FontWeight.bold),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: color.withOpacity(0.6), fontSize: 12),
-      filled: true, fillColor: Colors.white.withOpacity(0.06),
+      labelStyle: TextStyle(color: color.withValues(alpha: 0.6), fontSize: 12),
+      filled: true, fillColor: Colors.white.withValues(alpha: 0.06),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: color, width: 1.5)),
-      prefixIcon: Icon(Icons.person_outline, color: color.withOpacity(0.6), size: 18),
+      prefixIcon: Icon(Icons.person_outline, color: color.withValues(alpha: 0.6), size: 18),
     ),
   );
 
@@ -145,9 +145,9 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(isTurn ? '🔄  HOW TURN-BASED WORKS' : '⚡  HOW RACE MODE WORKS',
@@ -194,7 +194,7 @@ class _Result {
 
 class _MPRound extends StatefulWidget {
   final _MPMode mode;
-  final List<Color> hidden;
+  final List<Bottle> hidden;
   final String p1, p2;
   const _MPRound({required this.mode, required this.hidden, required this.p1, required this.p2});
 
@@ -208,14 +208,27 @@ class _MPRoundState extends State<_MPRound> {
 
   @override
   Widget build(BuildContext context) {
-    if (_phase == 3) return _ResultsScreen(r1: _r1!, r2: _r2!,
-        onPlayAgain: () => Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const MultiplayerScreen())),
-        onHome: () => Navigator.popUntil(context, (r) => r.isFirst));
+    if (_phase == 3) {
+      return _ResultsScreen(
+        r1: _r1!,
+        r2: _r2!,
+        onPlayAgain: () => Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MultiplayerScreen()),
+        ),
+        onHome: () => Navigator.popUntil(context, (r) => r.isFirst),
+      );
+    }
 
-    if (_phase == 1) return _HandoffScreen(
-        done: widget.p1, next: widget.p2, r1: _r1!, mode: widget.mode,
-        onReady: () => setState(() => _phase = 2));
+    if (_phase == 1) {
+      return _HandoffScreen(
+        done: widget.p1,
+        next: widget.p2,
+        r1: _r1!,
+        mode: widget.mode,
+        onReady: () => setState(() => _phase = 2),
+      );
+    }
 
     final isP1 = _phase == 0;
     return _ActiveGame(
@@ -236,7 +249,7 @@ class _MPRoundState extends State<_MPRound> {
 class _ActiveGame extends StatefulWidget {
   final String name;
   final Color color;
-  final List<Color> hidden;
+  final List<Bottle> hidden;
   final _MPMode mode;
   final void Function(_Result) onDone;
   const _ActiveGame({required this.name, required this.color, required this.hidden,
@@ -254,7 +267,7 @@ class _ActiveGameState extends State<_ActiveGame> {
   final _gs = GameService();
   final _ai = AIService();
 
-  late List<Color> _guess;
+  late List<Bottle?> _guess;
   bool _submitting = false;
   int _moves = 0;
   int? _lastMatch;
@@ -270,7 +283,7 @@ class _ActiveGameState extends State<_ActiveGame> {
   @override
   void initState() {
     super.initState();
-    _guess = List.filled(GameService.SEQUENCE_LENGTH, Colors.grey);
+    _guess = List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null);
     // Both modes use a timer:
     // Race  — counts UP   (fastest solver wins)
     // Turn  — counts DOWN (auto-ends turn at time limit so no one stalls)
@@ -303,8 +316,8 @@ class _ActiveGameState extends State<_ActiveGame> {
   void dispose() { _timer?.cancel(); super.dispose(); }
 
   bool get _canSubmit => _gs.isValidGuess(_guess) && !_submitting && !_done;
-  bool get _allFilled => !_guess.contains(Colors.grey);
-  bool get _hasDup => _allFilled && _guess.toSet().length < GameService.SEQUENCE_LENGTH;
+  bool get _allFilled => !_guess.contains(null);
+  bool get _hasDup => false; // Bottles can't be duplicated since we only have unique ones
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
@@ -356,9 +369,9 @@ class _ActiveGameState extends State<_ActiveGame> {
     }
   }
 
-  void _pick(int i, Color c) {
+  void _pick(int i, Bottle b) {
     if (_done || _submitting) return;
-    setState(() => _guess[i] = c);
+    setState(() => _guess[i] = b);
   }
 
   void _showPicker(int i) {
@@ -378,16 +391,18 @@ class _ActiveGameState extends State<_ActiveGame> {
                 style: TextStyle(color: Colors.white38, fontSize: 11)),
             const SizedBox(height: 16),
             Wrap(spacing: 12, runSpacing: 12,
-              children: AppConstants.availableColors.map((c) {
-                final used = _guess.contains(c) && _guess[i] != c;
+              children: AppConstants.availableColors.asMap().entries.map((e) {
+                final color = e.value;
+                final bottle = Bottle(id: 'mp_${i}_${e.key}', color: color, position: i);
+                final used = _guess.any((b) => b?.color == color) && _guess[i]?.color != color;
                 return GestureDetector(
-                  onTap: used ? null : () { _pick(i, c); Navigator.pop(context); },
+                  onTap: used ? null : () { _pick(i, bottle); Navigator.pop(context); },
                   child: Opacity(
                     opacity: used ? 0.25 : 1.0,
                     child: Container(
                       width: 52, height: 52,
                       decoration: BoxDecoration(
-                        color: c, shape: BoxShape.circle,
+                        color: color, shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: used ? const Icon(Icons.block, color: Colors.white54, size: 20) : null,
@@ -417,9 +432,9 @@ class _ActiveGameState extends State<_ActiveGame> {
             child: Row(children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(color: widget.color.withOpacity(0.15),
+                decoration: BoxDecoration(color: widget.color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: widget.color.withOpacity(0.5))),
+                    border: Border.all(color: widget.color.withValues(alpha: 0.5))),
                 child: Row(children: [
                   Icon(Icons.person, color: widget.color, size: 16),
                   const SizedBox(width: 6),
@@ -441,7 +456,7 @@ class _ActiveGameState extends State<_ActiveGame> {
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.06),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10)),
             child: Center(child: Text(
               _lastMatch == null
@@ -462,9 +477,9 @@ class _ActiveGameState extends State<_ActiveGame> {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: Colors.cyan.withOpacity(0.07),
+              decoration: BoxDecoration(color: Colors.cyan.withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.cyan.withOpacity(0.25))),
+                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.25))),
               child: Row(children: [
                 const Icon(Icons.psychology_outlined, color: Colors.cyan, size: 16),
                 const SizedBox(width: 8),
@@ -478,9 +493,9 @@ class _ActiveGameState extends State<_ActiveGame> {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1),
+              decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.withOpacity(0.4))),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.4))),
               child: const Row(children: [
                 Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 16),
                 SizedBox(width: 8),
@@ -504,8 +519,9 @@ class _ActiveGameState extends State<_ActiveGame> {
                     mainAxisSpacing: 10, childAspectRatio: 0.8),
                 itemCount: GameService.SEQUENCE_LENGTH,
                 itemBuilder: (_, i) {
-                  final c = _guess[i];
-                  final isEmpty = c == Colors.grey;
+                  final b = _guess[i];
+                  final isEmpty = b == null;
+                  final c = b?.color;
                   // ← highlight current guess positions that matched on last submit
                   final isMatched = _lastMatchedPositions.contains(i);
                   return GestureDetector(
@@ -513,7 +529,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       decoration: BoxDecoration(
-                        color: isEmpty ? Colors.white.withOpacity(0.08) : c,
+                        color: isEmpty ? Colors.white.withValues(alpha: 0.08) : c,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isMatched
@@ -522,7 +538,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                           width: isMatched ? 3 : isEmpty ? 1 : 2,
                         ),
                         boxShadow: isMatched
-                            ? [BoxShadow(color: Colors.greenAccent.withOpacity(0.5),
+                            ? [BoxShadow(color: Colors.greenAccent.withValues(alpha: 0.5),
                                 blurRadius: 12, spreadRadius: 2)]
                             : null,
                       ),
@@ -530,7 +546,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                         Center(child: isEmpty
                             ? const Icon(Icons.add, color: Colors.white30, size: 28)
                             : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Text(AppConstants.getColorName(c),
+                                Text(AppConstants.getColorName(c!),
                                     style: const TextStyle(color: Colors.white,
                                         fontSize: 10, fontWeight: FontWeight.bold),
                                     textAlign: TextAlign.center),
@@ -571,7 +587,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 2),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.06),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(8)),
                     child: Row(children: [
                       Text('#${a.attemptNumber}',
@@ -580,11 +596,13 @@ class _ActiveGameState extends State<_ActiveGame> {
                       // Mini bottle row with green borders on matched positions
                       ...List.generate(GameService.SEQUENCE_LENGTH, (idx) {
                         final matched = a.matchedPositions.contains(idx);
+                        final bottle = a.guess[idx];
+                        final bottleColor = bottle?.color ?? Colors.grey;
                         return Container(
                           width: 18, height: 22,
                           margin: const EdgeInsets.symmetric(horizontal: 1),
                           decoration: BoxDecoration(
-                            color: a.guess[idx],
+                            color: bottleColor,
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
                               color: matched ? Colors.greenAccent : Colors.white24,
@@ -634,23 +652,11 @@ class _ActiveGameState extends State<_ActiveGame> {
     );
   }
 
-  Widget _buildCountdown() {
-    final remaining = _timeLimit - _secs;
-    final mins = remaining ~/ 60;
-    final secs = (remaining % 60).toString().padLeft(2, '0');
-    final isUrgent = remaining <= 30;
-    final color = isUrgent ? Colors.redAccent : Colors.white54;
-    return _chip(
-      isUrgent ? '⚠️ $mins:$secs' : '⏱ $mins:$secs',
-      color,
-    );
-  }
-
   Widget _chip(String t, Color c) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(color: c.withOpacity(0.12),
+    decoration: BoxDecoration(color: c.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.withOpacity(0.4))),
+        border: Border.all(color: c.withValues(alpha: 0.4))),
     child: Text(t, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 13)),
   );
 }
@@ -685,9 +691,9 @@ class _HandoffScreen extends StatelessWidget {
           const SizedBox(height: 36),
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.06),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.cyan.withOpacity(0.2))),
+                border: Border.all(color: Colors.cyan.withValues(alpha: 0.2))),
             child: Column(children: [
               Text("$done's result",
                   style: const TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 14)),
@@ -726,7 +732,7 @@ class _HandoffScreen extends StatelessWidget {
   }
 
   Widget _stat(String l, String v, Color c) => Column(children: [
-    Text(l, style: TextStyle(color: c.withOpacity(0.6), fontSize: 9, letterSpacing: 2)),
+    Text(l, style: TextStyle(color: c.withValues(alpha: 0.6), fontSize: 9, letterSpacing: 2)),
     const SizedBox(height: 4),
     Text(v, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 13)),
   ]);
@@ -786,10 +792,10 @@ class _ResultsScreen extends StatelessWidget {
   Widget _card(_Result r, bool winner, Color c) => Expanded(child: Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: winner ? c.withOpacity(0.12) : Colors.white.withOpacity(0.05),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: winner ? c : Colors.white24, width: winner ? 2 : 1),
-      boxShadow: winner ? [BoxShadow(color: c.withOpacity(0.25), blurRadius: 16)] : null,
+      color: winner ? c.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: winner ? c : Colors.white24, width: winner ? 2 : 1),
+        boxShadow: winner ? [BoxShadow(color: c.withValues(alpha: 0.25), blurRadius: 16)] : null,
     ),
     child: Column(children: [
       if (winner) const Text('👑', style: TextStyle(fontSize: 22)),
@@ -805,7 +811,7 @@ class _ResultsScreen extends StatelessWidget {
   Widget _row(String l, String v, Color c) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Text(l, style: TextStyle(color: c.withOpacity(0.5), fontSize: 10, letterSpacing: 1)),
+      Text(l, style: TextStyle(color: c.withValues(alpha: 0.5), fontSize: 10, letterSpacing: 1)),
       Text(v, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 12)),
     ]),
   );

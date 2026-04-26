@@ -71,7 +71,7 @@ class BottleGrid extends StatelessWidget {
             width: isDragging ? 3 : 2,
           ),
           boxShadow: isDragging
-              ? [BoxShadow(color: color.withOpacity(0.6), blurRadius: 12, spreadRadius: 2)]
+              ? [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 12, spreadRadius: 2)]
               : [],
         ),
         child: Stack(
@@ -85,7 +85,7 @@ class BottleGrid extends StatelessWidget {
                 height: 16,
                 margin: const EdgeInsets.only(top: 4),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.7),
+                  color: color.withValues(alpha: 0.7),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
                   border: Border.all(color: Colors.white30, width: 1),
                 ),
@@ -98,7 +98,7 @@ class BottleGrid extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.circle,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     size: 28,
                   ),
                   const SizedBox(height: 4),

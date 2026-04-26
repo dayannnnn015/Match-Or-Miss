@@ -13,7 +13,7 @@ enum AIProvider {
 
 class OpenAIService {
   String? _apiKey;
-  AIProvider _currentProvider = AIProvider.openAI;
+  AIProvider _currentProvider = AIProvider.googleGemini;
 
   final Map<AIProvider, String> _apiEndpoints = {
     AIProvider.openAI: 'https://api.openai.com/v1/chat/completions',
@@ -30,7 +30,10 @@ class OpenAIService {
     _currentProvider = provider;
   }
 
-  bool get hasValidKey => _apiKey != null && _apiKey!.isNotEmpty;
+  bool get hasValidKey {
+    // Gemini and other providers need an API key
+    return _apiKey != null && _apiKey!.isNotEmpty;
+  }
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
@@ -48,7 +51,6 @@ class OpenAIService {
       final prompt = _buildHintPrompt(attempts, currentMatches, movesLeft, timeRemaining, playerId);
       return await _dispatch(prompt);
     } catch (e) {
-      print('AI hint error: $e');
       return _getFallbackHint(attempts, currentMatches);
     }
   }
@@ -67,7 +69,6 @@ class OpenAIService {
       final result = await _dispatch(prompt);
       return result.isEmpty ? _buildLocalFeedback(attempts, score, moves, timeSpent) : result;
     } catch (e) {
-      print('Game feedback error: $e');
       return _buildLocalFeedback(attempts, score, moves, timeSpent);
     }
   }
@@ -111,7 +112,6 @@ Respond ONLY with valid JSON (no markdown, no explanation):
         efficiencyScore: (data['efficiencyScore'] as num?)?.toDouble() ?? 50.0,
       );
     } catch (e) {
-      print('Deep analysis error: $e');
       return _getBasicAnalysis(attempts);
     }
   }
@@ -130,6 +130,9 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   // ─── Provider calls ────────────────────────────────────────────────────────
 
   Future<String> _callOpenAI(String prompt) async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('OpenAI API key not configured');
+    }
     final response = await http.post(
       Uri.parse(_apiEndpoints[AIProvider.openAI]!),
       headers: {
@@ -158,6 +161,9 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   }
 
   Future<String> _callAnthropic(String prompt) async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('Anthropic API key not configured');
+    }
     final response = await http.post(
       Uri.parse(_apiEndpoints[AIProvider.anthropic]!),
       headers: {
@@ -182,6 +188,9 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   }
 
   Future<String> _callGemini(String prompt) async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('Gemini API key not configured. Get a free key from Google AI Studio');
+    }
     final response = await http.post(
       Uri.parse('${_apiEndpoints[AIProvider.googleGemini]!}?key=$_apiKey'),
       headers: {'Content-Type': 'application/json'},
@@ -208,6 +217,9 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   }
 
   Future<String> _callCustomAPI(String prompt) async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('Custom API key not configured');
+    }
     final response = await http.post(
       Uri.parse('https://your-backend.com/api/ai-hint'),
       headers: {'Content-Type': 'application/json'},
@@ -223,17 +235,32 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   // ─── Prompt builders ───────────────────────────────────────────────────────
 
   String _buildCompletionPrompt(List<Attempt> attempts, int score, int moves, int timeSpent) {
-    return '''You are a cognitive training AI for "Match or Miss" — a puzzle where the player decodes a hidden 8-bottle color sequence.
+    return '''You are a cognitive coach analyzing a player's puzzle-solving strategy in "Match or Miss" (an 8-bottle color sequence puzzle).
 
-Results:
-- Score: $score
-- Moves used: $moves
-- Time: ${timeSpent ~/ 60}m ${timeSpent % 60}s
+PLAYER PERFORMANCE:
+- Final Score: $score
+- Moves Used: $moves
+- Time Spent: ${timeSpent ~/ 60}m ${timeSpent % 60}s
+- Total Attempts: ${attempts.length}
 
-Move history:
+MOVE ANALYSIS:
 ${_formatAttemptHistory(attempts)}
 
-Give encouraging feedback in 3-4 sentences: what they did well, one area to improve, and a practical tip. Write as flowing sentences, no bullet points.''';
+STRATEGY METRICS:
+- Average bottles changed per move: ${_calculateAvgChanges(attempts).toStringAsFixed(1)}
+- Impulsive moves (>3 changes with no improvement): ${_countImpulsiveMoves(attempts)}
+- Progress rate: ${_calculateProgressRate(attempts).toStringAsFixed(2)} matches per move
+- Peak performance: ${attempts.isEmpty ? 0 : attempts.map((a) => a.matches).reduce((a, b) => a > b ? a : b)}/8 matches
+
+FEEDBACK FOCUS: Analyze their decision-making patterns and how they can improve.
+
+Write 4-5 sentences covering:
+1. What their move pattern reveals about their thinking strategy (methodical vs impulsive)
+2. One specific strength they demonstrated
+3. One area to improve in their approach
+4. A concrete, actionable tip for better performance next time
+
+Write as flowing sentences, no bullet points. Be encouraging but honest.''';
   }
 
   String _buildHintPrompt(List<Attempt> attempts, int currentMatches, int movesLeft, int timeRemaining, String? playerId) {
@@ -312,14 +339,19 @@ HINT:''';
   // ─── Local fallbacks ───────────────────────────────────────────────────────
 
   String _getFallbackHint(List<Attempt> attempts, int currentMatches) {
-    if (attempts.isEmpty) return '🎮 Each color is used exactly once. Try locking in colors you know.';
+    if (attempts.isEmpty) {
+      return '🎮 Each color is used exactly once. Try locking in colors you know.';
+    }
     final last = attempts.last;
-    if (last.variablesChanged > 3)
+    if (last.variablesChanged > 3) {
       return '🎯 You changed ${last.variablesChanged} bottles. Try 1–2 at a time for cleaner data.';
-    if (currentMatches == 0 && attempts.length > 2)
+    }
+    if (currentMatches == 0 && attempts.length > 2) {
       return '💡 Zero matches — every color is wrong. Rotate all bottles to a fresh pattern.';
-    if (currentMatches > 0 && currentMatches < 4)
+    }
+    if (currentMatches > 0 && currentMatches < 4) {
       return '👍 Keep your $currentMatches matches fixed and swap the remaining ones.';
+    }
     return '🧠 Systematic swaps reveal the answer. What\'s your hypothesis?';
   }
 

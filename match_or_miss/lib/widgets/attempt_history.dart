@@ -86,20 +86,20 @@ class AttemptHistory extends StatelessWidget {
 
   Widget _buildAttemptRow(Attempt attempt, bool isLatest) {
     final matchCount = attempt.matches;
-    final total = AppConstants.sequenceLength;
+    const total = AppConstants.sequenceLength;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isLatest
-            ? Colors.white.withOpacity(0.07)
-            : Colors.white.withOpacity(0.03),
+            ? Colors.white.withValues(alpha: 0.07)
+            : Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isLatest
-              ? Colors.white.withOpacity(0.15)
-              : Colors.white.withOpacity(0.05),
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.05),
           width: 1,
         ),
       ),
@@ -123,9 +123,9 @@ class AttemptHistory extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(total, (i) {
-                final color = attempt.guess[i];
+                final bottle = attempt.guess[i];
                 final isMatched = attempt.matchedPositions.contains(i);
-                return _buildBottleCell(color, isMatched);
+                return _buildBottleCell(bottle, isMatched);
               }),
             ),
           ),
@@ -134,10 +134,10 @@ class AttemptHistory extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: _badgeColor(matchCount, total).withOpacity(0.2),
+              color: _badgeColor(matchCount, total).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _badgeColor(matchCount, total).withOpacity(0.5),
+                color: _badgeColor(matchCount, total).withValues(alpha: 0.5),
               ),
             ),
             child: Text(
@@ -154,24 +154,39 @@ class AttemptHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildBottleCell(Color color, bool isMatched) {
+  Widget _buildBottleCell(Bottle? bottle, bool isMatched) {
+    if (bottle == null) {
+      return Container(
+        width: 26,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade700,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+      );
+    }
+
     return Container(
       width: 26,
       height: 30,
       margin: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
-        color: color,
+        color: bottle.color,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isMatched ? Colors.greenAccent : Colors.white24,
           width: isMatched ? 2 : 1,
         ),
         boxShadow: isMatched
-            ? [BoxShadow(
-                color: Colors.greenAccent.withOpacity(0.4),
-                blurRadius: 6,
-                spreadRadius: 1,
-              )]
+            ? [
+                BoxShadow(
+                  color: Colors.greenAccent.withValues(alpha: 0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                )
+              ]
             : null,
       ),
       child: isMatched

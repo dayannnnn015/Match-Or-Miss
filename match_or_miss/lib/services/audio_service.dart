@@ -31,8 +31,12 @@ class AudioService {
       await _bgPlayer.setReleaseMode(ReleaseMode.loop);
       await _bgPlayer.play(AssetSource('sounds/background.mp3'));
     } catch (e) {
+<<<<<<< HEAD
       // File may not exist yet — fail silently
       debugPrint('AudioService: background music not found ($e)');
+=======
+      // Ignore audio playback errors
+>>>>>>> 8d87ab68c965739798a3c6e1013055dcba777fb8
     }
   }
 
