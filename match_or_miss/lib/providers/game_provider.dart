@@ -4,6 +4,8 @@ import '../models/game_models.dart';
 import '../utils/constants.dart';
 import '../services/game_service.dart';
 import '../services/openai_service.dart' as ai_svc;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/secure_storage_service.dart';
 
 class GameProvider extends ChangeNotifier {
@@ -29,38 +31,12 @@ class GameProvider extends ChangeNotifier {
 
   bool get canSubmit => false; // No submit button needed
 
-  GameProvider() {
-    _loadApiKey();
-    // Default to Gemini - users can change in settings if needed
-    _openAIService.setApiKey('', provider: ai_svc.AIProvider.googleGemini);
-  }
-
-  /// On startup: try loading key in this order:
-  /// 1. Previously saved key in secure storage (persists across launches)
-  /// 2. Key baked in at build time via --dart-define (first-run seed)
-  ///
-  /// This means:
-  /// - First build: key comes from --dart-define, gets saved to secure storage
-  /// - Every launch after: key loads from secure storage automatically
-  /// - No user action ever needed
-  Future<void> _loadApiKey() async {
-    // 1. Try secure storage first (fastest path after first launch)
-    String? storedKey = await SecureStorageService.getAPIKey('gemini');
-
-    if (storedKey != null && storedKey.isNotEmpty) {
-      _openAIService.setApiKey(storedKey, provider: ai_svc.AIProvider.googleGemini);
-      return;
+  /// Key is loaded in main() before the app starts and passed in directly,
+  /// so it's always available immediately — no async race condition.
+  GameProvider({String initialApiKey = ''}) {
+    if (initialApiKey.isNotEmpty) {
+      _openAIService.setApiKey(initialApiKey, provider: ai_svc.AIProvider.googleGemini);
     }
-
-    // 2. Fall back to build-time key, and save it for future launches
-    const buildTimeKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-    if (buildTimeKey.isNotEmpty) {
-      _openAIService.setApiKey(buildTimeKey, provider: ai_svc.AIProvider.googleGemini);
-      // Save so future launches don't need --dart-define
-      await SecureStorageService.saveAPIKey('gemini', buildTimeKey);
-    }
-
-    // 3. No key found — local fallback will be used silently
   }
 
   /// Lets you update the key at runtime (e.g. from a dev settings screen)
@@ -68,7 +44,12 @@ class GameProvider extends ChangeNotifier {
   Future<void> setAndSaveApiKey(String apiKey,
       {ai_svc.AIProvider provider = ai_svc.AIProvider.googleGemini}) async {
     _openAIService.setApiKey(apiKey, provider: provider);
-    await SecureStorageService.saveAPIKey('gemini', apiKey);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gemini_api_key', apiKey);
+    if (!kIsWeb) {
+      // Also save to secure storage on mobile (encrypted)
+      await SecureStorageService.saveAPIKey('gemini', apiKey);
+    }
     notifyListeners();
   }
 

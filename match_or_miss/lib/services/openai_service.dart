@@ -19,10 +19,9 @@ class OpenAIService {
     AIProvider.openAI: 'https://api.openai.com/v1/chat/completions',
     AIProvider.anthropic: 'https://api.anthropic.com/v1/messages',
     AIProvider.googleGemini:
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
   };
 
-  // Timeout prevents the submit button from hanging forever
   static const Duration _timeout = Duration(seconds: 15);
 
   void setApiKey(String key, {AIProvider provider = AIProvider.openAI}) {
@@ -31,7 +30,6 @@ class OpenAIService {
   }
 
   bool get hasValidKey {
-    // Gemini and other providers need an API key
     return _apiKey != null && _apiKey!.isNotEmpty;
   }
 
@@ -120,10 +118,10 @@ Respond ONLY with valid JSON (no markdown, no explanation):
 
   Future<String> _dispatch(String prompt) {
     switch (_currentProvider) {
-      case AIProvider.openAI:      return _callOpenAI(prompt);
-      case AIProvider.anthropic:   return _callAnthropic(prompt);
+      case AIProvider.openAI:       return _callOpenAI(prompt);
+      case AIProvider.anthropic:    return _callAnthropic(prompt);
       case AIProvider.googleGemini: return _callGemini(prompt);
-      case AIProvider.customAPI:   return _callCustomAPI(prompt);
+      case AIProvider.customAPI:    return _callCustomAPI(prompt);
     }
   }
 
@@ -172,7 +170,7 @@ Respond ONLY with valid JSON (no markdown, no explanation):
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'claude-haiku-4-5-20251001', // fast & affordable
+        'model': 'claude-haiku-4-5-20251001',
         'max_tokens': 200,
         'messages': [
           {'role': 'user', 'content': prompt},
@@ -235,7 +233,7 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   // ─── Prompt builders ───────────────────────────────────────────────────────
 
   String _buildCompletionPrompt(List<Attempt> attempts, int score, int moves, int timeSpent) {
-    return '''You are a cognitive coach analyzing a player's puzzle-solving strategy in "Match or Miss" (an 8-bottle color sequence puzzle).
+    return '''You are a cognitive coach analyzing a player\'s puzzle-solving strategy in "Match or Miss" (an 8-bottle color sequence puzzle).
 
 PLAYER PERFORMANCE:
 - Final Score: $score

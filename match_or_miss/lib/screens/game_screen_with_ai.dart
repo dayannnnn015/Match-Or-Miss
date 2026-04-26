@@ -6,6 +6,7 @@ import '../models/game_models.dart';
 import '../services/game_service.dart';
 import '../widgets/bottle_widget.dart';
 import '../widgets/timer_widget.dart';
+import '../widgets/api_key_dialog.dart';
 
 class GameScreenWithAI extends StatefulWidget {
   const GameScreenWithAI({super.key});
@@ -27,7 +28,6 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
-    // Check game state periodically
     Future.delayed(const Duration(milliseconds: 500), () {
       _checkGamePeriodically();
     });
@@ -52,7 +52,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(context),
       body: Consumer<GameProvider>(
         builder: (context, gameProvider, child) {
           if (gameProvider.currentSession == null) {
@@ -62,7 +62,6 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
           final session = gameProvider.currentSession!;
           final mode = session.mode;
 
-          // Reset dialog flags when a new game starts
           if (_resultShown && _gameFinished) {
             _gameFinished = false;
             _resultShown = false;
@@ -72,7 +71,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             if (!_resultShown && gameProvider.isSolved() && mounted) {
               _gameFinished = true;
               _resultShown = true;
-              _showResultDialog(gameProvider, won: true);
+              _showResultDialog(context, won: true);
             }
           });
 
@@ -106,7 +105,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: const Color(0xFF0a0015),
       title: const Text(
@@ -115,6 +114,21 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       ),
       centerTitle: true,
       elevation: 0,
+      actions: [
+        Consumer<GameProvider>(
+          builder: (context, gp, _) => IconButton(
+            icon: Icon(
+              gp.hasAIKey ? Icons.smart_toy : Icons.smart_toy_outlined,
+              color: gp.hasAIKey ? Colors.greenAccent : Colors.white38,
+            ),
+            tooltip: gp.hasAIKey ? 'AI connected' : 'Connect AI for insights',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const APIKeyDialog(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -135,7 +149,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
                   color: Colors.cyanAccent,
                   shadows: [
                     Shadow(
-                      color: Colors.cyanAccent.withValues(alpha: 0.5),
+                      color: Colors.cyanAccent.withOpacity(0.5),
                       blurRadius: 10,
                     )
                   ],
@@ -147,10 +161,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
               const SizedBox(height: 4),
               Text(
                 'Score: ${gameProvider.currentSession?.currentScore ?? 0}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.white70,
-                ),
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
               ),
             ],
           ),
@@ -174,17 +185,15 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              modeColor.withValues(alpha: 0.3),
-              modeColor.withValues(alpha: 0.1),
+              modeColor.withOpacity(0.3),
+              modeColor.withOpacity(0.1),
             ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
           ),
           border: Border.all(color: modeColor, width: 2),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: modeColor.withValues(alpha: 0.3),
+              color: modeColor.withOpacity(0.3),
               blurRadius: 12,
               spreadRadius: 1,
             )
@@ -205,12 +214,9 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
 
   Color _getModeColor(GameMode mode) {
     switch (mode) {
-      case GameMode.quick:
-        return Colors.greenAccent;
-      case GameMode.standard:
-        return Colors.blueAccent;
-      case GameMode.competitive:
-        return Colors.redAccent;
+      case GameMode.quick:       return Colors.greenAccent;
+      case GameMode.standard:    return Colors.blueAccent;
+      case GameMode.competitive: return Colors.redAccent;
     }
   }
 
@@ -219,27 +225,19 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.1),
+        color: Colors.red.withOpacity(0.1),
         border: Border.all(color: Colors.redAccent, width: 1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            '⚡ COMPETITIVE MODE',
-            style: TextStyle(
-              color: Colors.redAccent,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
+          const Text('⚡ COMPETITIVE MODE',
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
           Text(
             'Time Left: ${session.remainingTime}s',
             style: TextStyle(
-              color: session.remainingTime < 10
-                  ? Colors.redAccent
-                  : Colors.orangeAccent,
+              color: session.remainingTime < 10 ? Colors.redAccent : Colors.orangeAccent,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -247,8 +245,6 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       ),
     );
   }
-
-
 
   Widget _buildFeedback(GameProvider gameProvider, GameSession session) {
     final currentMatches = gameProvider.getCurrentMatches();
@@ -261,20 +257,14 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isSolved ? Colors.green.withValues(alpha: 0.15) : Colors.blue.withValues(alpha: 0.1),
+        color: isSolved ? Colors.green.withOpacity(0.15) : Colors.blue.withOpacity(0.1),
         border: Border.all(
           color: isSolved ? Colors.greenAccent : Colors.cyanAccent,
           width: 2,
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: isSolved
-            ? [
-                BoxShadow(
-                  color: Colors.greenAccent.withValues(alpha: 0.5),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                )
-              ]
+            ? [BoxShadow(color: Colors.greenAccent.withOpacity(0.5), blurRadius: 20, spreadRadius: 2)]
             : [],
       ),
       child: Column(
@@ -284,11 +274,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             duration: const Duration(milliseconds: 600),
             child: Text(
               isSolved ? '🎉 SOLVED!' : 'Correct Positions',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.cyanAccent,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.cyanAccent),
             ),
           ),
           const SizedBox(height: 8),
@@ -299,9 +285,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
               fontWeight: FontWeight.bold,
               color: isSolved ? Colors.greenAccent : Colors.white,
             ),
-            child: Text(
-              '$currentMatches / $maxMatches',
-            ),
+            child: Text('$currentMatches / $maxMatches'),
           ),
         ],
       ),
@@ -315,12 +299,10 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
         child: Column(
           children: [
             ShaderMask(
-              shaderCallback: (bounds) => LinearGradient(
+              shaderCallback: (bounds) => const LinearGradient(
                 colors: [Colors.cyan, Colors.cyanAccent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ).createShader(bounds),
-              child: Text(
+              child: const Text(
                 'Drag to swap bottles:',
                 style: TextStyle(
                   color: Colors.white,
@@ -339,17 +321,11 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
                     gameProvider.currentGuessSlots.length,
                     (index) {
                       final bottle = gameProvider.currentGuessSlots[index];
-
                       if (bottle == null) return const SizedBox.shrink();
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _buildAnimatedBottleWrapper(
-              bottle,
-              index,
-              gameProvider,
-            ),
-          );
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: _buildAnimatedBottleWrapper(bottle, index, gameProvider),
+                      );
                     },
                   ),
                 ),
@@ -361,11 +337,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     );
   }
 
-  Widget _buildAnimatedBottleWrapper(
-    Bottle bottle,
-    int index,
-    GameProvider gameProvider,
-  ) {
+  Widget _buildAnimatedBottleWrapper(Bottle bottle, int index, GameProvider gameProvider) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: Duration(milliseconds: 300 + (index * 50)),
@@ -373,25 +345,14 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       builder: (context, value, child) {
         return ScaleTransition(
           scale: AlwaysStoppedAnimation(value),
-          child: FadeTransition(
-            opacity: AlwaysStoppedAnimation(value),
-            child: child,
-          ),
+          child: FadeTransition(opacity: AlwaysStoppedAnimation(value), child: child),
         );
       },
-      child: _buildDraggableBottle(
-        bottle,
-        index,
-        gameProvider,
-      ),
+      child: _buildDraggableBottle(bottle, index, gameProvider),
     );
   }
 
-  Widget _buildDraggableBottle(
-    Bottle bottle,
-    int index,
-    GameProvider gameProvider,
-  ) {
+  Widget _buildDraggableBottle(Bottle bottle, int index, GameProvider gameProvider) {
     return DragTarget<int>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (details) {
@@ -405,12 +366,8 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
           feedback: Material(
             color: Colors.transparent,
             child: ScaleTransition(
-              scale: AlwaysStoppedAnimation(1.15),
-              child: BottleWidget(
-                bottle: bottle,
-                size: 70,
-                isDragging: true,
-              ),
+              scale: const AlwaysStoppedAnimation(1.15),
+              child: BottleWidget(bottle: bottle, size: 70, isDragging: true),
             ),
           ),
           childWhenDragging: SizedBox(
@@ -418,19 +375,13 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             height: 91,
             child: Opacity(
               opacity: 0.4,
-              child: BottleWidget(
-                bottle: bottle,
-                size: 70,
-              ),
+              child: BottleWidget(bottle: bottle, size: 70),
             ),
           ),
           child: AnimatedScale(
             scale: candidateData.isNotEmpty ? 1.05 : 1.0,
             duration: const Duration(milliseconds: 200),
-            child: BottleWidget(
-              bottle: bottle,
-              size: 70,
-            ),
+            child: BottleWidget(bottle: bottle, size: 70),
           ),
         );
       },
@@ -447,12 +398,10 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
               colors: [Colors.grey.shade600, Colors.grey.shade800],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withOpacity(0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               )
@@ -463,22 +412,19 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             child: InkWell(
               onTap: () => gameProvider.resetGuess(),
               borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.restart_alt, color: Colors.white),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Reset Game',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    Icon(Icons.restart_alt, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('Reset Game',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            letterSpacing: 0.5)),
                   ],
                 ),
               ),
@@ -489,79 +435,184 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     );
   }
 
-  void _showResultDialog(GameProvider gp, {required bool won}) {
+  void _showResultDialog(BuildContext ctx, {required bool won}) {
     showDialog(
-      context: context,
+      context: ctx,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1a2e),
-        title: Text(
-          won ? '🎉 Congratulations!' : '😢 Game Over',
-          style: TextStyle(
-            color: won ? Colors.greenAccent : Colors.redAccent,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                gp.postGameInsight,
-                style: const TextStyle(
-                  color: Colors.white,
-                  height: 1.5,
-                ),
-              ),
-              if (gp.isLoadingInsight)
+      builder: (dialogContext) => Consumer<GameProvider>(
+        builder: (_, gp, __) => Dialog(
+          backgroundColor: const Color(0xFF1a1a2e),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.75,
+              maxWidth: 500,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
                 Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                  child: Text(
+                    won ? '🎉 Congratulations!' : '😢 Game Over',
+                    style: TextStyle(
+                      color: won ? Colors.greenAccent : Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+                // Scrollable content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (gp.isLoadingInsight) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.cyanAccent.withOpacity(0.07),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
+                            ),
+                            child: const Row(
+                              children: [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    '🤖 Analyzing your game…',
+                                    style: TextStyle(color: Colors.cyanAccent, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (gp.postGameInsight.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: gp.hasAIKey
+                                  ? Colors.cyanAccent.withOpacity(0.07)
+                                  : Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: gp.hasAIKey
+                                    ? Colors.cyanAccent.withOpacity(0.3)
+                                    : Colors.white12,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      gp.hasAIKey ? Icons.smart_toy : Icons.analytics_outlined,
+                                      color: gp.hasAIKey ? Colors.cyanAccent : Colors.white38,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      gp.hasAIKey ? 'AI Feedback' : 'Performance Summary',
+                                      style: TextStyle(
+                                        color: gp.hasAIKey ? Colors.cyanAccent : Colors.white38,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  gp.postGameInsight,
+                                  style: const TextStyle(color: Colors.white, height: 1.6, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!gp.hasAIKey) ...[
+                            const SizedBox(height: 12),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.pop(dialogContext);
+                                showDialog(
+                                  context: ctx,
+                                  builder: (_) => const APIKeyDialog(),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.cyan.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.cyan.withOpacity(0.4)),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.key, color: Colors.cyan, size: 15),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Connect AI for richer feedback →',
+                                      style: TextStyle(color: Colors.cyan, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+                // Action buttons
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Row(
-                    children: const [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
-                        ),
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          context.read<GameProvider>().initializeGame(
+                            context.read<GameProvider>().currentSession?.mode ?? GameMode.standard,
+                          );
+                          _gameFinished = false;
+                          _resultShown = false;
+                        },
+                        child: const Text('Next Game', style: TextStyle(color: Colors.cyanAccent)),
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Getting AI insights...',
-                        style: TextStyle(
-                          color: Colors.cyanAccent,
-                          fontSize: 12,
-                        ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('Back to Home', style: TextStyle(color: Colors.white54)),
                       ),
                     ],
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<GameProvider>().initializeGame(
-                context.read<GameProvider>().currentSession?.mode ?? GameMode.standard,
-              );
-              _gameFinished = false;
-              _resultShown = false;
-            },
-            child: const Text('Next Game'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Back to Home'),
-          ),
-        ],
       ),
     );
   }
