@@ -1,104 +1,51 @@
+// ============================================================================
+// TIMER WIDGET - ELEGANT COUNTDOWN
+// ============================================================================
 // lib/widgets/timer_widget.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../models/game_models.dart';
-import 'dart:async';
 
 class TimerWidget extends StatefulWidget {
-  const TimerWidget({
-    super.key,
-  });
-
+  const TimerWidget({super.key});
   @override
-  State<TimerWidget> createState() => TimerWidgetState();
+  State<TimerWidget> createState() => _TimerWidgetState();
 }
 
-class TimerWidgetState extends State<TimerWidget> {
-  late Timer _timer;
-  int _elapsedSeconds = 0;
+class _TimerWidgetState extends State<TimerWidget> {
+  Timer? _timer;
+  int _elapsed = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _elapsedSeconds++;
-      });
-    });
-  }
-
+  void initState() { super.initState(); _timer = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() => _elapsed++); }); }
   @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
+  void dispose() { _timer?.cancel(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<GameProvider>(
-      builder: (context, gameProvider, _) {
-        final session = gameProvider.currentSession;
-        if (session == null) return const SizedBox.shrink();
-
-        final mode = session.mode;
-        
-        // Quick mode: no timer display
-        if (mode == GameMode.quick) {
-          return const SizedBox.shrink();
-        }
-        
-        // Standard & Competitive modes: show stopwatch (elapsed time)
-        Duration duration = Duration(seconds: _elapsedSeconds);
-        String timeString = _formatDuration(duration);
-        Color timerColor = mode == GameMode.standard ? const Color(0xFFB7D9E2) : const Color(0xFFEEBBDD);
-        return _buildTimerContainer(timeString, timerColor);
+      builder: (context, gp, _) {
+        final mode = gp.currentSession?.mode;
+        if (mode == GameMode.quick) return const SizedBox.shrink();
+        final color = mode == GameMode.standard ? const Color(0xFF6C63FF) : const Color(0xFFFF6584);
+        final mins = (_elapsed ~/ 60).toString().padLeft(2, '0');
+        final secs = (_elapsed % 60).toString().padLeft(2, '0');
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(40),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.access_time, size: 14, color: Color(0xFF6C63FF)),
+            const SizedBox(width: 6),
+            Text('$mins:$secs', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16, fontFamily: 'monospace')),
+          ]),
+        );
       },
     );
-  }
-
-  Widget _buildTimerContainer(String timeString, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 12,
-            spreadRadius: 1,
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.schedule, color: color),
-          const SizedBox(width: 8),
-          Text(
-            timeString,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-              fontFamily: 'Monospace',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return "$twoDigitMinutes:$twoDigitSeconds";
   }
 }
