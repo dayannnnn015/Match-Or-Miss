@@ -42,11 +42,11 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF09111F),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF0a0a2a), Color(0xFF1a0033), Color(0xFF002244)]),
+            colors: [Color(0xFF09111F), Color(0xFF10283D), Color(0xFF183948)]),
         ),
         child: SafeArea(
           child: SingleChildScrollView(
@@ -55,9 +55,9 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
               Row(children: [
                 IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white70, size: 18),
                     onPressed: () => Navigator.pop(context)),
-                const Text('MULTIPLAYER', style: TextStyle(color: Colors.cyan, fontSize: 20,
+                const Text('MULTIPLAYER', style: TextStyle(color: Color(0xFF6DD3FF), fontSize: 20,
                     fontWeight: FontWeight.bold, letterSpacing: 2,
-                    shadows: [Shadow(color: Colors.cyan, blurRadius: 10)])),
+                  shadows: [Shadow(color: Color(0xFF6DD3FF), blurRadius: 10)])),
               ]),
               const SizedBox(height: 28),
               _sectionLabel('SELECT MODE'),
@@ -70,9 +70,9 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
               const SizedBox(height: 24),
               _sectionLabel('PLAYER NAMES'),
               const SizedBox(height: 10),
-              _nameField(_p1Ctrl, 'Player 1', Colors.cyan),
+              _nameField(_p1Ctrl, 'Player 1', const Color(0xFF6DD3FF)),
               const SizedBox(height: 10),
-              _nameField(_p2Ctrl, 'Player 2', Colors.orange),
+              _nameField(_p2Ctrl, 'Player 2', const Color(0xFFFFA15E)),
               const SizedBox(height: 24),
               _infoCard(),
               const SizedBox(height: 32),
@@ -82,9 +82,9 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Colors.orange, Color(0xFFBB5500)]),
+                    gradient: const LinearGradient(colors: [Color(0xFFFFA15E), Color(0xFFD46A2F)]),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.4),
+                    boxShadow: [BoxShadow(color: const Color(0xFFFFA15E).withValues(alpha: 0.4),
                         blurRadius: 20, offset: const Offset(0, 6))],
                   ),
                   child: const Center(child: Text('START MATCH',
@@ -110,14 +110,19 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: sel ? Colors.orange.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
+          color: sel
+              ? const Color(0xFFFFA15E).withValues(alpha: 0.16)
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: sel ? Colors.orange : Colors.white24, width: sel ? 1.5 : 1),
+          border: Border.all(
+            color: sel ? const Color(0xFFFFA15E) : Colors.white24,
+            width: sel ? 1.5 : 1,
+          ),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(icon, style: const TextStyle(fontSize: 26)),
           const SizedBox(height: 8),
-          Text(title, style: TextStyle(color: sel ? Colors.orange : Colors.white70,
+          Text(title, style: TextStyle(color: sel ? const Color(0xFFFFC37A) : Colors.white70,
               fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
           const SizedBox(height: 4),
           Text(sub, style: const TextStyle(color: Colors.white38, fontSize: 11, height: 1.4)),
@@ -147,7 +152,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+        border: Border.all(color: const Color(0xFFFFA15E).withValues(alpha: 0.25)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(isTurn ? '🔄  HOW TURN-BASED WORKS' : '⚡  HOW RACE MODE WORKS',
@@ -267,11 +272,12 @@ class _ActiveGameState extends State<_ActiveGame> {
   final _gs = GameService();
   final _ai = AIService();
 
+  int get _sequenceLength => widget.hidden.length;
+
   late List<Bottle?> _guess;
   bool _submitting = false;
   int _moves = 0;
   int? _lastMatch;
-  List<int> _lastMatchedPositions = [];
   String _hint = '';
   bool _done = false;
   bool _resultShown = false;
@@ -283,7 +289,7 @@ class _ActiveGameState extends State<_ActiveGame> {
   @override
   void initState() {
     super.initState();
-    _guess = List<Bottle?>.filled(GameService.SEQUENCE_LENGTH, null);
+    _guess = List<Bottle?>.filled(_sequenceLength, null);
     // Both modes use a timer:
     // Race  — counts UP   (fastest solver wins)
     // Turn  — counts DOWN (auto-ends turn at time limit so no one stalls)
@@ -327,15 +333,13 @@ class _ActiveGameState extends State<_ActiveGame> {
     final prev = _history.isNotEmpty ? _history.last.guess : _guess;
     final changed = _gs.calculateVariablesChanged(prev, _guess);
     final matches = _gs.calculateMatches(_guess, widget.hidden);
-    // ← NEW: get which positions matched
-    final matchedPositions = _gs.getMatchedPositions(_guess, widget.hidden);
     final prevM = _history.isNotEmpty ? _history.last.matches : 0;
 
     final attempt = Attempt(
       attemptNumber: _moves + 1,
       guess: List.from(_guess),
       matches: matches,
-      matchedPositions: matchedPositions,   // ← required field now populated
+      matchedPositions: const [],
       timestamp: DateTime.now(),
       variablesChanged: changed,
       wasImpulsive: _gs.isImpulsiveMove(changed, prevM, matches),
@@ -344,12 +348,11 @@ class _ActiveGameState extends State<_ActiveGame> {
     _moves++;
 
     final hint = _ai.getRealTimeHint(attempt, _moves);
-    final solved = matches == GameService.SEQUENCE_LENGTH;
+    final solved = matches == _sequenceLength;
     final out = _moves >= _maxMoves || (widget.mode == _MPMode.turnBased && _secs >= _timeLimit);
 
     setState(() {
       _lastMatch = matches;
-      _lastMatchedPositions = matchedPositions;
       _hint = hint;
       _submitting = false;
       _done = solved || out;
@@ -423,7 +426,7 @@ class _ActiveGameState extends State<_ActiveGame> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF0a0a2a), Color(0xFF1a0033), Color(0xFF002244)]),
+            colors: [Color(0xFF09111F), Color(0xFF10283D), Color(0xFF183948)]),
         ),
         child: SafeArea(child: Column(children: [
           // Header
@@ -461,13 +464,13 @@ class _ActiveGameState extends State<_ActiveGame> {
             child: Center(child: Text(
               _lastMatch == null
                   ? 'Tap each bottle to assign a color. Every color is used exactly once.'
-                  : _lastMatch == GameService.SEQUENCE_LENGTH
-                      ? '🎉 All ${GameService.SEQUENCE_LENGTH} bottles matched!'
-                      : '$_lastMatch / ${GameService.SEQUENCE_LENGTH} correct — green bottles show exact matches',
+                  : _lastMatch == _sequenceLength
+                      ? '🎉 All $_sequenceLength bottles matched!'
+                      : '$_lastMatch / $_sequenceLength correct matches',
               style: TextStyle(
                 color: _lastMatch == null ? Colors.white38
-                    : _lastMatch == GameService.SEQUENCE_LENGTH ? Colors.greenAccent
-                    : _lastMatch! > 0 ? Colors.green : Colors.orange,
+                    : _lastMatch == _sequenceLength ? const Color(0xFF56D676)
+                    : _lastMatch! > 0 ? const Color(0xFF56D676) : const Color(0xFFFFA15E),
                 fontSize: 13),
               textAlign: TextAlign.center,
             )),
@@ -477,14 +480,14 @@ class _ActiveGameState extends State<_ActiveGame> {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: Colors.cyan.withValues(alpha: 0.07),
+              decoration: BoxDecoration(color: const Color(0xFF6DD3FF).withValues(alpha: 0.09),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.25))),
+                  border: Border.all(color: const Color(0xFF6DD3FF).withValues(alpha: 0.25))),
               child: Row(children: [
-                const Icon(Icons.psychology_outlined, color: Colors.cyan, size: 16),
+                const Icon(Icons.psychology_outlined, color: Color(0xFF6DD3FF), size: 16),
                 const SizedBox(width: 8),
                 Expanded(child: Text(_hint,
-                    style: const TextStyle(color: Colors.cyan, fontSize: 12))),
+                    style: const TextStyle(color: Color(0xFF6DD3FF), fontSize: 12))),
               ]),
             ),
           ),
@@ -493,21 +496,21 @@ class _ActiveGameState extends State<_ActiveGame> {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1),
+              decoration: BoxDecoration(color: const Color(0xFFFFA15E).withValues(alpha: 0.11),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.withValues(alpha: 0.4))),
+                  border: Border.all(color: const Color(0xFFFFA15E).withValues(alpha: 0.4))),
               child: const Row(children: [
-                Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 16),
+                Icon(Icons.warning_amber_outlined, color: Color(0xFFFFA15E), size: 16),
                 SizedBox(width: 8),
                 Expanded(child: Text('Duplicate color! Each color can only be used once.',
-                    style: TextStyle(color: Colors.orange, fontSize: 12))),
+                    style: TextStyle(color: Color(0xFFFFA15E), fontSize: 12))),
               ]),
             ),
           ),
 
           const SizedBox(height: 10),
 
-          // Bottle grid — green glow on matched positions after submit
+          // Bottle grid
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -517,13 +520,11 @@ class _ActiveGameState extends State<_ActiveGame> {
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4, crossAxisSpacing: 10,
                     mainAxisSpacing: 10, childAspectRatio: 0.8),
-                itemCount: GameService.SEQUENCE_LENGTH,
+                itemCount: _sequenceLength,
                 itemBuilder: (_, i) {
                   final b = _guess[i];
                   final isEmpty = b == null;
                   final c = b?.color;
-                  // ← highlight current guess positions that matched on last submit
-                  final isMatched = _lastMatchedPositions.contains(i);
                   return GestureDetector(
                     onTap: (_done || _submitting) ? null : () => _showPicker(i),
                     child: AnimatedContainer(
@@ -532,15 +533,9 @@ class _ActiveGameState extends State<_ActiveGame> {
                         color: isEmpty ? Colors.white.withValues(alpha: 0.08) : c,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isMatched
-                              ? Colors.greenAccent
-                              : isEmpty ? Colors.white24 : Colors.white38,
-                          width: isMatched ? 3 : isEmpty ? 1 : 2,
+                          color: isEmpty ? Colors.white24 : Colors.white38,
+                          width: isEmpty ? 1 : 2,
                         ),
-                        boxShadow: isMatched
-                            ? [BoxShadow(color: Colors.greenAccent.withValues(alpha: 0.5),
-                                blurRadius: 12, spreadRadius: 2)]
-                            : null,
                       ),
                       child: Stack(alignment: Alignment.center, children: [
                         Center(child: isEmpty
@@ -551,17 +546,6 @@ class _ActiveGameState extends State<_ActiveGame> {
                                         fontSize: 10, fontWeight: FontWeight.bold),
                                     textAlign: TextAlign.center),
                               ])),
-                        // Checkmark badge on matched bottles
-                        if (isMatched)
-                          Positioned(
-                            top: 6, right: 6,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                  color: Colors.greenAccent, shape: BoxShape.circle),
-                              child: const Icon(Icons.check, color: Colors.black, size: 10),
-                            ),
-                          ),
                       ]),
                     ),
                   );
@@ -579,7 +563,7 @@ class _ActiveGameState extends State<_ActiveGame> {
               reverse: true, // newest first
               itemBuilder: (_, i) {
                 final a = _history[_history.length - 1 - i];
-                final ratio = a.matches / GameService.SEQUENCE_LENGTH;
+                final ratio = a.matches / _sequenceLength;
                 final col = ratio == 1.0 ? Colors.greenAccent
                     : ratio >= 0.5 ? Colors.cyan : Colors.orange;
                 return Opacity(
@@ -593,9 +577,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                       Text('#${a.attemptNumber}',
                           style: TextStyle(color: col, fontSize: 10, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
-                      // Mini bottle row with green borders on matched positions
-                      ...List.generate(GameService.SEQUENCE_LENGTH, (idx) {
-                        final matched = a.matchedPositions.contains(idx);
+                      ...List.generate(_sequenceLength, (idx) {
                         final bottle = a.guess[idx];
                         final bottleColor = bottle?.color ?? Colors.grey;
                         return Container(
@@ -604,18 +586,12 @@ class _ActiveGameState extends State<_ActiveGame> {
                           decoration: BoxDecoration(
                             color: bottleColor,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: matched ? Colors.greenAccent : Colors.white24,
-                              width: matched ? 2 : 1,
-                            ),
+                            border: Border.all(color: Colors.white24, width: 1),
                           ),
-                          child: matched
-                              ? const Icon(Icons.check, color: Colors.white, size: 10)
-                              : null,
                         );
                       }),
                       const SizedBox(width: 8),
-                      Text('${a.matches}/${GameService.SEQUENCE_LENGTH}',
+                      Text('${a.matches}/$_sequenceLength',
                           style: TextStyle(color: col, fontSize: 10, fontWeight: FontWeight.bold)),
                     ]),
                   ),
@@ -639,7 +615,7 @@ class _ActiveGameState extends State<_ActiveGame> {
                   ? const SizedBox(width: 20, height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : Text(
-                      !_allFilled ? 'Fill all ${GameService.SEQUENCE_LENGTH} bottles first'
+                      !_allFilled ? 'Fill all $_sequenceLength bottles first'
                           : _hasDup ? 'Fix duplicate colors'
                           : _done ? '✓ Done'
                           : 'SUBMIT GUESS',
@@ -676,7 +652,7 @@ class _HandoffScreen extends StatelessWidget {
     return Scaffold(body: Container(
       decoration: const BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [Color(0xFF0a0a2a), Color(0xFF1a0033), Color(0xFF002244)])),
+          colors: [Color(0xFF09111F), Color(0xFF10283D), Color(0xFF183948)])),
       child: SafeArea(child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -685,26 +661,26 @@ class _HandoffScreen extends StatelessWidget {
           const Text('HAND THE DEVICE TO',
               style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 3)),
           const SizedBox(height: 8),
-          Text(next.toUpperCase(), style: const TextStyle(color: Colors.orange, fontSize: 34,
+            Text(next.toUpperCase(), style: const TextStyle(color: Color(0xFFFFA15E), fontSize: 34,
               fontWeight: FontWeight.w900, letterSpacing: 2,
-              shadows: [Shadow(color: Colors.orange, blurRadius: 16)])),
+              shadows: [Shadow(color: Color(0xFFFFA15E), blurRadius: 16)])),
           const SizedBox(height: 36),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.cyan.withValues(alpha: 0.2))),
+                border: Border.all(color: const Color(0xFF6DD3FF).withValues(alpha: 0.25))),
             child: Column(children: [
               Text("$done's result",
-                  style: const TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 14)),
+                  style: const TextStyle(color: Color(0xFF6DD3FF), fontWeight: FontWeight.bold, fontSize: 14)),
               const SizedBox(height: 12),
               Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                 _stat('STATUS', r1.solved ? '✅ Solved' : '❌ Failed',
                     r1.solved ? Colors.greenAccent : Colors.redAccent),
-                _stat('MOVES', '${r1.moves}', Colors.cyan),
+                _stat('MOVES', '${r1.moves}', const Color(0xFF6DD3FF)),
                 if (mode == _MPMode.race)
-                  _stat('TIME', '${r1.secs}s', Colors.orange),
-                _stat('BEST', '${r1.bestMatch}/8', Colors.white70),
+                  _stat('TIME', '${r1.secs}s', const Color(0xFFFFA15E)),
+                _stat('BEST', '${r1.bestMatch}', Colors.white70),
               ]),
             ]),
           ),
@@ -718,7 +694,7 @@ class _HandoffScreen extends StatelessWidget {
             child: Container(
               width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Colors.orange, Color(0xFFBB5500)]),
+                gradient: const LinearGradient(colors: [Color(0xFFFFA15E), Color(0xFFD46A2F)]),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(child: Text('${next.toUpperCase()} — I\'M READY!',
@@ -753,7 +729,7 @@ class _ResultsScreen extends StatelessWidget {
     return Scaffold(body: Container(
       decoration: const BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [Color(0xFF0a0a2a), Color(0xFF1a0033), Color(0xFF002244)])),
+          colors: [Color(0xFF09111F), Color(0xFF10283D), Color(0xFF183948)])),
       child: SafeArea(child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(children: [
@@ -761,18 +737,18 @@ class _ResultsScreen extends StatelessWidget {
           Text(tie ? '🤝' : '🏆', style: const TextStyle(fontSize: 64)),
           const SizedBox(height: 12),
           Text(tie ? "IT'S A TIE!" : '${(p1w ? r1 : r2).name.toUpperCase()} WINS!',
-            style: TextStyle(color: tie ? Colors.white70 : Colors.amber,
+            style: TextStyle(color: tie ? Colors.white70 : const Color(0xFFFFC37A),
                 fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 2,
-                shadows: [Shadow(color: tie ? Colors.white30 : Colors.amber, blurRadius: 16)])),
+                shadows: [Shadow(color: tie ? Colors.white30 : const Color(0xFFFFC37A), blurRadius: 16)])),
           const SizedBox(height: 32),
           Row(children: [
-            _card(r1, p1w && !tie, Colors.cyan),
+            _card(r1, p1w && !tie, const Color(0xFF6DD3FF)),
             const SizedBox(width: 12),
-            _card(r2, p2w && !tie, Colors.orange),
+            _card(r2, p2w && !tie, const Color(0xFFFFA15E)),
           ]),
           const Spacer(),
           ElevatedButton(onPressed: onPlayAgain,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange,
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFA15E),
                 minimumSize: const Size(double.infinity, 52),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             child: const Text('PLAY AGAIN',
@@ -803,7 +779,7 @@ class _ResultsScreen extends StatelessWidget {
       const SizedBox(height: 10),
       _row('Status', r.solved ? '✅' : '❌', c),
       _row('Moves', '${r.moves}', c),
-      _row('Best', '${r.bestMatch}/8', c),
+      _row('Best', '${r.bestMatch}', c),
       _row('Time', '${r.secs}s', c),
     ]),
   ));

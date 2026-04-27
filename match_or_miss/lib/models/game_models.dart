@@ -69,6 +69,8 @@ class GameSession {
     return (timeLimit + timeBonus) - elapsed;
   }
 
+  int get sequenceLength => hiddenSequence.length;
+
   bool get isTimeUp => remainingTime <= 0;
   bool get isMovesExhausted => currentMoves >= maxMoves;
   bool get isSlotsFilled => currentGuessSlots.every((b) => b != null);

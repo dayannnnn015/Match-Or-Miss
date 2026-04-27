@@ -7,6 +7,8 @@ import '../models/game_models.dart';
 class AppConstants {
   // ─── Sequence ────────────────────────────────────────────────────────────
   static const int sequenceLength = 8;
+  static const int quickModeStartLength = 3;
+  static const int quickModeMaxLength = sequenceLength;
 
   // ─── Mode settings ────────────────────────────────────────────────────────
   // Quick:       relaxed intro — enough time to think, enough moves to learn
@@ -66,7 +68,7 @@ class AppConstants {
   static const Map<GameMode, GameModeConfig> modeConfigs = {
     GameMode.quick: GameModeConfig(
       name: 'QUICK MODE',
-      description: 'Fast-paced — fewer moves, think smart',
+      description: 'Starts at 3 bottles and scales up as you improve',
       timeLimit: quickModeTime,
       icon: Icons.flash_on,
       color: Colors.green,

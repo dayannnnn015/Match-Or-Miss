@@ -5,8 +5,7 @@ import 'game_service.dart';
 
 extension GameServiceExtensions on GameService {
   bool isValidGuess(List<Color> guess) {
-    return guess.length == GameService.SEQUENCE_LENGTH &&
-        !guess.contains(Colors.grey);
+    return guess.isNotEmpty && !guess.contains(Colors.grey);
   }
   
   String getStrategyHint(int attemptsCount, int maxMatches) {
@@ -19,7 +18,7 @@ extension GameServiceExtensions on GameService {
     }
     
     if (maxMatches >= 4) {
-      return "Great progress! Now focus on the remaining ${GameService.SEQUENCE_LENGTH - maxMatches} positions.";
+      return "Great progress! Now focus on the remaining unknown positions.";
     }
     
     return "Try a systematic approach: test each position individually.";
@@ -27,7 +26,8 @@ extension GameServiceExtensions on GameService {
   
   List<int> findMatchingPositions(List<Color> guess, List<Color> hidden) {
     List<int> matches = [];
-    for (int i = 0; i < GameService.SEQUENCE_LENGTH; i++) {
+    final limit = guess.length < hidden.length ? guess.length : hidden.length;
+    for (int i = 0; i < limit; i++) {
       if (guess[i] == hidden[i]) {
         matches.add(i);
       }

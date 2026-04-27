@@ -234,8 +234,14 @@ Respond ONLY with valid JSON (no markdown, no explanation):
 
   // ─── Prompt builders ───────────────────────────────────────────────────────
 
+  int _sequenceLengthFromAttempts(List<Attempt> attempts) {
+    if (attempts.isEmpty) return 8;
+    return attempts.first.guess.length;
+  }
+
   String _buildCompletionPrompt(List<Attempt> attempts, int score, int moves, int timeSpent) {
-    return '''You are a cognitive coach analyzing a player's puzzle-solving strategy in "Match or Miss" (an 8-bottle color sequence puzzle).
+    final sequenceLength = _sequenceLengthFromAttempts(attempts);
+    return '''You are a cognitive coach analyzing a player's puzzle-solving strategy in "Match or Miss" (a $sequenceLength-bottle color sequence puzzle).
 
 PLAYER PERFORMANCE:
 - Final Score: $score
@@ -250,7 +256,7 @@ STRATEGY METRICS:
 - Average bottles changed per move: ${_calculateAvgChanges(attempts).toStringAsFixed(1)}
 - Impulsive moves (>3 changes with no improvement): ${_countImpulsiveMoves(attempts)}
 - Progress rate: ${_calculateProgressRate(attempts).toStringAsFixed(2)} matches per move
-- Peak performance: ${attempts.isEmpty ? 0 : attempts.map((a) => a.matches).reduce((a, b) => a > b ? a : b)}/8 matches
+- Peak performance: ${attempts.isEmpty ? 0 : attempts.map((a) => a.matches).reduce((a, b) => a > b ? a : b)}/$sequenceLength matches
 
 FEEDBACK FOCUS: Analyze their decision-making patterns and how they can improve.
 
@@ -264,10 +270,11 @@ Write as flowing sentences, no bullet points. Be encouraging but honest.''';
   }
 
   String _buildHintPrompt(List<Attempt> attempts, int currentMatches, int movesLeft, int timeRemaining, String? playerId) {
+    final sequenceLength = _sequenceLengthFromAttempts(attempts);
     return '''
-You are a cognitive training AI for "Match or Miss" (8-bottle color sequence puzzle, each color used exactly once).
+You are a cognitive training AI for "Match or Miss" ($sequenceLength-bottle color sequence puzzle, each color used exactly once).
 
-State: $movesLeft moves left, $timeRemaining seconds, $currentMatches/8 matches.
+State: $movesLeft moves left, $timeRemaining seconds, $currentMatches/$sequenceLength matches.
 
 Recent moves:
 ${_formatAttemptHistory(attempts)}
@@ -283,11 +290,12 @@ HINT:''';
 
   String _formatAttemptHistory(List<Attempt> attempts) {
     if (attempts.isEmpty) return 'No attempts yet.';
+    final sequenceLength = _sequenceLengthFromAttempts(attempts);
     final buf = StringBuffer();
     for (int i = max(0, attempts.length - 5); i < attempts.length; i++) {
       final a = attempts[i];
       buf.writeln(
-          'Move ${a.attemptNumber}: ${a.matches}/8 matches, '
+          'Move ${a.attemptNumber}: ${a.matches}/$sequenceLength matches, '
           'changed ${a.variablesChanged} bottles, '
           '${a.wasImpulsive ? 'IMPULSIVE' : 'methodical'}');
     }
@@ -319,14 +327,15 @@ HINT:''';
   }
 
   List<MoveEfficiency> _calculateMoveEfficiencies(List<Attempt> attempts) {
+    final sequenceLength = _sequenceLengthFromAttempts(attempts);
     return List.generate(attempts.length, (i) {
       final eff = i == 0
-          ? attempts[i].matches / 8.0
-          : (attempts[i].matches - attempts[i - 1].matches) / 8.0;
+          ? attempts[i].matches / sequenceLength
+          : (attempts[i].matches - attempts[i - 1].matches) / sequenceLength;
       return MoveEfficiency(
         moveNumber: i + 1,
         efficiency: eff,
-        feedback: eff > 0 ? 'Improved by ${(eff * 8).round()} match(es)' : 'No improvement',
+        feedback: eff > 0 ? 'Improved by ${(eff * sequenceLength).round()} match(es)' : 'No improvement',
       );
     });
   }
@@ -357,11 +366,12 @@ HINT:''';
 
   String _buildLocalFeedback(List<Attempt> attempts, int score, int moves, int timeSpent) {
     if (attempts.isEmpty) return 'Complete a game to see your analysis!';
+    final sequenceLength = _sequenceLengthFromAttempts(attempts);
     final best = attempts.reduce((a, b) => a.matches > b.matches ? a : b);
     final avgChanged = attempts.map((a) => a.variablesChanged).reduce((a, b) => a + b) / attempts.length;
     final impulsive = attempts.where((a) => a.wasImpulsive).length;
     final buf = StringBuffer();
-    buf.write('Your best move was move ${best.attemptNumber} with ${best.matches}/8 matches. ');
+    buf.write('Your best move was move ${best.attemptNumber} with ${best.matches}/$sequenceLength matches. ');
     buf.write(impulsive == 0
         ? 'Great discipline — no impulsive moves detected! '
         : '$impulsive impulsive move(s) detected; slowing down helps isolate variables. ');

@@ -26,8 +26,22 @@ class MyApp extends StatelessWidget {
         title: 'Match or Miss',
         theme: ThemeData(
           brightness: Brightness.dark,
-          primarySwatch: Colors.blue,
-          scaffoldBackgroundColor: Colors.black,
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF6DD3FF),
+            secondary: Color(0xFFFFA15E),
+            surface: Color(0xFF10283D),
+          ),
+          scaffoldBackgroundColor: const Color(0xFF09111F),
+          fontFamily: 'Segoe UI',
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          cardTheme: CardThemeData(
+            color: Colors.white.withValues(alpha: 0.05),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
           visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
         home: const SplashScreen(),

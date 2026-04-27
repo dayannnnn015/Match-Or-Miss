@@ -15,6 +15,8 @@ class GameProvider extends ChangeNotifier {
   List<Bottle?> _previousGuessSlots = []; // Track previous state for attempt recording
   bool _isSubmitting = false;
   bool _resultDialogShown = false; // Track whether result dialog has been shown
+  int _quickSequenceLength = AppConstants.quickModeStartLength;
+  final List<_QuickRoundPerformance> _quickPerformanceHistory = [];
 
   String _postGameInsight = '';
   bool _isLoadingInsight = false;
@@ -26,6 +28,7 @@ class GameProvider extends ChangeNotifier {
   GameSession? get currentSession => _currentSession;
   List<Bottle?> get currentGuessSlots => _currentGuessSlots;
   bool get isSubmitting => _isSubmitting;
+  int get quickSequenceLength => _quickSequenceLength;
 
   bool get canSubmit => false; // No submit button needed
 
@@ -82,7 +85,12 @@ class GameProvider extends ChangeNotifier {
   // ─── Game lifecycle ────────────────────────────────────────────────────────
 
   void initializeGame(GameMode mode, {int? customMaxMoves}) {
-    final hidden = _gameService.generateHiddenSequence();
+    _recordFinishedQuickRound();
+    _adaptQuickSequenceLength();
+
+    final sequenceLength =
+        mode == GameMode.quick ? _quickSequenceLength : AppConstants.sequenceLength;
+    final hidden = _gameService.generateHiddenSequence(length: sequenceLength);
     // Shuffle bottles so puzzle starts unsolved
     final shuffledBottles = _gameService.generateAvailableBottles(hidden);
     
@@ -128,6 +136,10 @@ class GameProvider extends ChangeNotifier {
 
   void swapBottles(int index1, int index2) {
     if (_currentSession == null) return;
+    if (index1 < 0 || index2 < 0) return;
+    if (index1 >= _currentGuessSlots.length || index2 >= _currentGuessSlots.length) {
+      return;
+    }
     
     // Step 1: Record state before swap
     final previousMatches = _gameService.calculateMatches(
@@ -141,8 +153,7 @@ class GameProvider extends ChangeNotifier {
     // Step 3: Calculate new state after swap
     final currentMatches = _gameService.calculateMatches(
         _currentGuessSlots, _currentSession!.hiddenSequence);
-    final matchedPositions = _gameService.getMatchedPositions(
-        _currentGuessSlots, _currentSession!.hiddenSequence);
+    const matchedPositions = <int>[];
     
     // Step 4: Calculate variables changed
     final variablesChanged = _gameService.calculateVariablesChanged(
@@ -182,9 +193,7 @@ class GameProvider extends ChangeNotifier {
   }
   
   List<int> getCurrentMatchedPositions() {
-    if (_currentSession == null) return [];
-    return _gameService.getMatchedPositions(
-        _currentGuessSlots, _currentSession!.hiddenSequence);
+    return [];
   }
   
   bool isSolved() {
@@ -265,20 +274,21 @@ class GameProvider extends ChangeNotifier {
 
     final attempts = session.attempts;
     final best = attempts.reduce((a, b) => a.matches > b.matches ? a : b);
+    final sequenceLength = session.hiddenSequence.length;
     final avgChanged = attempts
             .map((a) => a.variablesChanged.toDouble())
             .reduce((a, b) => a + b) /
         attempts.length;
     final impulsive = attempts.where((a) => a.wasImpulsive).length;
-    final won = attempts.last.matches == GameService.SEQUENCE_LENGTH;
+    final won = attempts.last.matches == sequenceLength;
 
     final buf = StringBuffer();
     if (won) {
       buf.writeln('🎉 Puzzle solved in ${session.currentMoves} moves!');
     } else {
-      buf.writeln('You reached ${attempts.last.matches}/8 matches.');
+      buf.writeln('You reached ${attempts.last.matches}/$sequenceLength matches.');
     }
-    buf.writeln('Best move: Move ${best.attemptNumber} with ${best.matches}/8.');
+    buf.writeln('Best move: Move ${best.attemptNumber} with ${best.matches}/$sequenceLength.');
     buf.writeln('Avg bottles swapped per move: ${avgChanged.toStringAsFixed(1)}.');
     if (impulsive > 0) {
       buf.writeln('$impulsive impulsive move(s) — try changing fewer bottles at a time.');
@@ -289,6 +299,61 @@ class GameProvider extends ChangeNotifier {
         ? 'Tip: Swap 1–2 bottles per move for cleaner feedback.'
         : 'Tip: Keep isolating one variable at a time — you\'re on the right track.');
     return buf.toString();
+  }
+
+  void _recordFinishedQuickRound() {
+    final session = _currentSession;
+    if (session == null || session.mode != GameMode.quick || session.attempts.isEmpty) {
+      return;
+    }
+
+    final solved = _gameService.isSequenceSolved(_currentGuessSlots, session.hiddenSequence);
+    final impulsiveMoves = session.attempts.where((a) => a.wasImpulsive).length;
+    final impulsiveRate = impulsiveMoves / session.attempts.length;
+
+    final maxMoves = session.maxMoves <= 0 ? 1 : session.maxMoves;
+    final moveEfficiency =
+        ((maxMoves - session.currentMoves).clamp(0, maxMoves)) / maxMoves;
+
+    final performanceScore =
+        (solved ? 0.6 : 0.0) + (moveEfficiency * 0.25) + ((1 - impulsiveRate) * 0.15);
+
+    _quickPerformanceHistory.add(
+      _QuickRoundPerformance(solved: solved, performanceScore: performanceScore),
+    );
+
+    if (_quickPerformanceHistory.length > 8) {
+      _quickPerformanceHistory.removeAt(0);
+    }
+  }
+
+  void _adaptQuickSequenceLength() {
+    if (_quickPerformanceHistory.isEmpty) {
+      _quickSequenceLength = AppConstants.quickModeStartLength;
+      return;
+    }
+
+    final solvedCount = _quickPerformanceHistory.where((r) => r.solved).length;
+    final solveRate = solvedCount / _quickPerformanceHistory.length;
+    final avgPerformance = _quickPerformanceHistory
+            .map((r) => r.performanceScore)
+            .reduce((a, b) => a + b) /
+        _quickPerformanceHistory.length;
+
+    if (solveRate >= 0.7 && avgPerformance >= 0.65) {
+      _quickSequenceLength = (_quickSequenceLength + 1).clamp(
+        AppConstants.quickModeStartLength,
+        AppConstants.quickModeMaxLength,
+      );
+      return;
+    }
+
+    if (solveRate < 0.4 || avgPerformance < 0.4) {
+      _quickSequenceLength = (_quickSequenceLength - 1).clamp(
+        AppConstants.quickModeStartLength,
+        AppConstants.quickModeMaxLength,
+      );
+    }
   }
 
   String buildPostGameAnalysis() => _buildLocalInsight();
@@ -324,4 +389,14 @@ class GameProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+}
+
+class _QuickRoundPerformance {
+  final bool solved;
+  final double performanceScore;
+
+  const _QuickRoundPerformance({
+    required this.solved,
+    required this.performanceScore,
+  });
 }

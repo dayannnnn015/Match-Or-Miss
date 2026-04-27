@@ -47,9 +47,6 @@ class AttemptHistory extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const Spacer(),
-              // Legend
-              _legendDot(Colors.greenAccent, '✓ correct position'),
             ],
           ),
         ),
@@ -69,24 +66,9 @@ class AttemptHistory extends StatelessWidget {
     );
   }
 
-  Widget _legendDot(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-      ],
-    );
-  }
-
   Widget _buildAttemptRow(Attempt attempt, bool isLatest) {
     final matchCount = attempt.matches;
-    const total = AppConstants.sequenceLength;
+    final total = attempt.guess.length;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -118,14 +100,13 @@ class AttemptHistory extends StatelessWidget {
             ),
           ),
 
-          // Bottle row with match indicators
+          // Bottle row (no positional match reveal)
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(total, (i) {
                 final bottle = attempt.guess[i];
-                final isMatched = attempt.matchedPositions.contains(i);
-                return _buildBottleCell(bottle, isMatched);
+                return _buildBottleCell(bottle);
               }),
             ),
           ),
@@ -154,7 +135,7 @@ class AttemptHistory extends StatelessWidget {
     );
   }
 
-  Widget _buildBottleCell(Bottle? bottle, bool isMatched) {
+  Widget _buildBottleCell(Bottle? bottle) {
     if (bottle == null) {
       return Container(
         width: 26,
@@ -175,23 +156,8 @@ class AttemptHistory extends StatelessWidget {
       decoration: BoxDecoration(
         color: bottle.color,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isMatched ? Colors.greenAccent : Colors.white24,
-          width: isMatched ? 2 : 1,
-        ),
-        boxShadow: isMatched
-            ? [
-                BoxShadow(
-                  color: Colors.greenAccent.withValues(alpha: 0.4),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                )
-              ]
-            : null,
+        border: Border.all(color: Colors.white24, width: 1),
       ),
-      child: isMatched
-          ? const Icon(Icons.check, color: Colors.white, size: 14)
-          : null,
     );
   }
 
