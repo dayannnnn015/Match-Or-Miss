@@ -14,7 +14,7 @@ class APIKeyDialog extends StatefulWidget {
 
 class _APIKeyDialogState extends State<APIKeyDialog> {
   String _apiKey = '';
-  AIProviderType _selectedProvider = AIProviderType.anthropic;
+  AIProviderType _selectedProvider = AIProviderType.openAI;
   bool _showKey = false;
   bool _isSaving = false;
 

@@ -12,6 +12,19 @@ class GameProvider extends ChangeNotifier {
   final GameService _gameService = GameService();
   final ai_svc.OpenAIService _openAIService = ai_svc.OpenAIService();
 
+  static String _providerKey(ai_svc.AIProvider provider) {
+    switch (provider) {
+      case ai_svc.AIProvider.openAI:
+        return 'openai';
+      case ai_svc.AIProvider.anthropic:
+        return 'anthropic';
+      case ai_svc.AIProvider.googleGemini:
+        return 'gemini';
+      case ai_svc.AIProvider.customAPI:
+        return 'custom';
+    }
+  }
+
   GameSession? _currentSession;
   List<Bottle?> _currentGuessSlots = [];
   List<Bottle?> _previousGuessSlots = []; // Track previous state for attempt recording
@@ -36,29 +49,33 @@ class GameProvider extends ChangeNotifier {
 
   /// Key is loaded in main() before the app starts and passed in directly,
   /// so it's always available immediately — no async race condition.
-  GameProvider({String initialApiKey = ''}) {
+  GameProvider({
+    String initialApiKey = '',
+    ai_svc.AIProvider initialProvider = ai_svc.AIProvider.openAI,
+  }) {
     if (initialApiKey.isNotEmpty) {
-      _openAIService.setApiKey(initialApiKey, provider: ai_svc.AIProvider.googleGemini);
+      _openAIService.setApiKey(initialApiKey, provider: initialProvider);
     }
   }
 
   /// Lets you update the key at runtime (e.g. from a dev settings screen)
   /// Saves to secure storage so it persists after the app restarts.
   Future<void> setAndSaveApiKey(String apiKey,
-      {ai_svc.AIProvider provider = ai_svc.AIProvider.googleGemini}) async {
+      {ai_svc.AIProvider provider = ai_svc.AIProvider.openAI}) async {
     _openAIService.setApiKey(apiKey, provider: provider);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', apiKey);
+    final providerKey = _providerKey(provider);
+    await prefs.setString('${providerKey}_api_key', apiKey);
     if (!kIsWeb) {
       // Also save to secure storage on mobile (encrypted)
-      await SecureStorageService.saveAPIKey('gemini', apiKey);
+      await SecureStorageService.saveAPIKey(providerKey, apiKey);
     }
     notifyListeners();
   }
 
   // Keep for backward compatibility with api_key_dialog
   void setAIApiKey(String apiKey,
-      {ai_svc.AIProvider provider = ai_svc.AIProvider.googleGemini}) {
+      {ai_svc.AIProvider provider = ai_svc.AIProvider.openAI}) {
     _openAIService.setApiKey(apiKey, provider: provider);
     notifyListeners();
   }

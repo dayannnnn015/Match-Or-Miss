@@ -1,7 +1,6 @@
 // lib/widgets/attempt_history.dart
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
-import '../utils/constants.dart';
 
 class AttemptHistory extends StatelessWidget {
   const AttemptHistory({

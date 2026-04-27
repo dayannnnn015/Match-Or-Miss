@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../models/game_models.dart';
 import '../services/ai_service.dart';
-import '../widgets/animated_widgets.dart';
 import '../widgets/glassmorphic_widgets.dart';
 
 class AnalysisScreen extends StatefulWidget {

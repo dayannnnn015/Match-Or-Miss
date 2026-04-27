@@ -13,7 +13,7 @@ enum AIProvider {
 
 class OpenAIService {
   String? _apiKey;
-  AIProvider _currentProvider = AIProvider.googleGemini;
+  AIProvider _currentProvider = AIProvider.openAI;
 
   final Map<AIProvider, String> _apiEndpoints = {
     AIProvider.openAI: 'https://api.openai.com/v1/chat/completions',
@@ -238,12 +238,8 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   }
 
   String _buildCompletionPrompt(List<Attempt> attempts, int score, int moves, int timeSpent) {
-<<<<<<< HEAD
     final sequenceLength = _sequenceLengthFromAttempts(attempts);
     return '''You are a cognitive coach analyzing a player's puzzle-solving strategy in "Match or Miss" (a $sequenceLength-bottle color sequence puzzle).
-=======
-    return '''You are a cognitive coach analyzing a player\'s puzzle-solving strategy in "Match or Miss" (an 8-bottle color sequence puzzle).
->>>>>>> 1ac71084d222f99e5cd02ad79a657cc32c1f4c0e
 
 PLAYER PERFORMANCE:
 - Final Score: $score

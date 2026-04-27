@@ -14,26 +14,69 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   String? savedKey;
+  ai_svc.AIProvider savedProvider = ai_svc.AIProvider.openAI;
 
   if (kIsWeb) {
     // Web: use shared_preferences (browser localStorage)
     final prefs = await SharedPreferences.getInstance();
-    savedKey = prefs.getString('gemini_api_key');
+    savedKey = prefs.getString('openai_api_key');
+    if (savedKey != null && savedKey.isNotEmpty) {
+      savedProvider = ai_svc.AIProvider.openAI;
+    } else {
+      savedKey = prefs.getString('gemini_api_key');
+      if (savedKey != null && savedKey.isNotEmpty) {
+        savedProvider = ai_svc.AIProvider.googleGemini;
+      }
+    }
   } else {
     // Mobile: use flutter_secure_storage (encrypted keychain/keystore)
-    savedKey = await SecureStorageService.getAPIKey('gemini');
+    savedKey = await SecureStorageService.getAPIKey('openai');
+    if (savedKey != null && savedKey.isNotEmpty) {
+      savedProvider = ai_svc.AIProvider.openAI;
+    } else {
+      savedKey = await SecureStorageService.getAPIKey('gemini');
+      if (savedKey != null && savedKey.isNotEmpty) {
+        savedProvider = ai_svc.AIProvider.googleGemini;
+      }
+    }
+
     // Also check shared_preferences as fallback
     if (savedKey == null || savedKey.isEmpty) {
       final prefs = await SharedPreferences.getInstance();
-      savedKey = prefs.getString('gemini_api_key');
+      savedKey = prefs.getString('openai_api_key');
+      if (savedKey != null && savedKey.isNotEmpty) {
+        savedProvider = ai_svc.AIProvider.openAI;
+      } else {
+        savedKey = prefs.getString('gemini_api_key');
+        if (savedKey != null && savedKey.isNotEmpty) {
+          savedProvider = ai_svc.AIProvider.googleGemini;
+        }
+      }
     }
   }
 
-  // Fall back to build-time --dart-define key
+  // Fall back to build-time --dart-define keys
+  if (savedKey == null || savedKey.isEmpty) {
+    const openAIBuildTimeKey = String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
+    if (openAIBuildTimeKey.isNotEmpty) {
+      savedKey = openAIBuildTimeKey;
+      savedProvider = ai_svc.AIProvider.openAI;
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('openai_api_key', openAIBuildTimeKey);
+      } else {
+        await SecureStorageService.saveAPIKey('openai', openAIBuildTimeKey);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('openai_api_key', openAIBuildTimeKey);
+      }
+    }
+  }
+
   if (savedKey == null || savedKey.isEmpty) {
     const buildTimeKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
     if (buildTimeKey.isNotEmpty) {
       savedKey = buildTimeKey;
+      savedProvider = ai_svc.AIProvider.googleGemini;
       if (kIsWeb) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('gemini_api_key', buildTimeKey);
@@ -45,26 +88,43 @@ void main() async {
     }
   }
 
-  // ── DEV ONLY: hardcoded fallback so key always works on Chrome ──────────
-  // Remove this block before publishing your app!
+  // DEV ONLY: hardcoded fallback. Replace with your real OpenAI key.
+  // Remove this block before publishing your app.
   if (savedKey == null || savedKey.isEmpty) {
-    savedKey = 'AIzaSyBirbgvTFvrqXfozk36HfBqqN_qOKXpTRo';
+    const hardcodedOpenAIKey = 'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop';
+    savedKey = hardcodedOpenAIKey;
+    savedProvider = ai_svc.AIProvider.openAI;
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('openai_api_key', hardcodedOpenAIKey);
+    } else {
+      await SecureStorageService.saveAPIKey('openai', hardcodedOpenAIKey);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('openai_api_key', hardcodedOpenAIKey);
+    }
   }
-  // ────────────────────────────────────────────────────────────────────────
 
-  runApp(MyApp(initialApiKey: savedKey ?? ''));
+  runApp(MyApp(initialApiKey: savedKey, initialProvider: savedProvider));
 }
 
 class MyApp extends StatelessWidget {
   final String initialApiKey;
-  const MyApp({super.key, required this.initialApiKey});
+  final ai_svc.AIProvider initialProvider;
+  const MyApp({
+    super.key,
+    required this.initialApiKey,
+    required this.initialProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => GameProvider(initialApiKey: initialApiKey),
+          create: (_) => GameProvider(
+            initialApiKey: initialApiKey,
+            initialProvider: initialProvider,
+          ),
         ),
         ChangeNotifierProvider(create: (_) => MultiplayerProvider()),
         ChangeNotifierProvider(create: (_) => AIProvider()),

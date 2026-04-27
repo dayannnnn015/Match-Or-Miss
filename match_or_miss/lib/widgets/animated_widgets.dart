@@ -24,7 +24,6 @@ class AnimatedCounter extends StatefulWidget {
 class _AnimatedCounterState extends State<AnimatedCounter>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _offsetAnimation;
   int _previousValue = 0;
 
   @override
