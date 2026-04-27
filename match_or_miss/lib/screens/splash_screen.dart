@@ -1,3 +1,8 @@
+// ============================================================================
+// SPLASH SCREEN - STUNNING ENTRANCE ANIMATION
+// ============================================================================
+// lib/screens/splash_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 
@@ -10,64 +15,49 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late AnimationController _controller;
+  late Animation<double> _logoScale;
+  late Animation<double> _logoFade;
+  late Animation<double> _textSlide;
+  late Animation<Offset> _ringRotate;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 2200),
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2800),
       vsync: this,
     );
 
-    // Scale animation for logo
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.0, 0.4, curve: Curves.elasticOut),
-      ),
+    _logoScale = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.4, curve: Curves.elasticOut)),
     );
 
-    // Fade animation for text
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 0.6, curve: Curves.easeIn),
-      ),
+    _logoFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.3, curve: Curves.easeOut)),
     );
 
-    // Slide animation for subtitle
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.4, 0.7, curve: Curves.easeOut),
-      ),
+    _textSlide = Tween<double>(begin: 50, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 0.6, curve: Curves.easeOutBack)),
     );
 
-    _animationController.forward();
+    _ringRotate = Tween<Offset>(begin: const Offset(0, 0), end: const Offset(0, 0)).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
+    );
 
-    // Navigate after animation completes
-    Future.delayed(const Duration(seconds: 3), () {
+    _controller.forward();
+
+    Future.delayed(const Duration(milliseconds: 2800), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const HomeScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
           transitionDuration: const Duration(milliseconds: 800),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.2),
-                  end: Offset.zero,
-                ).animate(animation),
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 1.05, end: 1.0).animate(animation),
                 child: child,
               ),
             );
@@ -79,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -88,130 +78,155 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: RadialGradient(
+            center: Alignment.center,
+            radius: 1.2,
             colors: [
-              const Color(0xFF0B1B2B),
-              const Color(0xFF123047),
-              const Color(0xFF1D3B45),
+              const Color(0xFF1A1A2E),
+              const Color(0xFF0F0F1A),
+              const Color(0xFF05050A),
             ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Animated logo with glow
-              ScaleTransition(
-                scale: _scaleAnimation,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF6DD3FF).withValues(alpha: 0.45),
-                        const Color(0xFF2A80C9).withValues(alpha: 0.12),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6DD3FF).withValues(alpha: 0.55),
-                        blurRadius: 30,
-                        spreadRadius: 10,
+        child: Stack(
+          children: [
+            // Animated background particles
+            ...List.generate(3, (index) {
+              return Positioned(
+                top: MediaQuery.of(context).size.height * (0.2 + index * 0.3),
+                left: MediaQuery.of(context).size.width * (0.1 + index * 0.4),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 1500 + index * 300),
+                  curve: Curves.easeInOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: (value * 0.3).clamp(0, 0.3),
+                      child: Container(
+                        width: 2 + index * 2,
+                        height: 2 + index * 2,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF6C63FF),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.psychology,
-                    size: 70,
-                    color: Colors.cyan,
-                  ),
+                    );
+                  },
                 ),
-              ),
-              const SizedBox(height: 40),
-
-              // Animated title
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [
-                    const Text(
-                      'MATCH OR MISS',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 4,
-                        shadows: [
-                          Shadow(
-                            color: Color(0xFF6DD3FF),
-                            blurRadius: 15,
-                            offset: Offset(0, 0),
+              );
+            }),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Animated ring
+                  AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: 1 + (1 - _logoScale.value) * 0.5,
+                        child: Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                const Color(0xFF6C63FF).withValues(alpha: 0.3),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 1.0],
+                            ),
+                          ),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: ScaleTransition(
+                      scale: _logoScale,
+                      child: FadeTransition(
+                        opacity: _logoFade,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF6C63FF), Color(0xFFFF6584)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF6C63FF).withValues(alpha: 0.5),
+                                blurRadius: 30,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.hexagon_outlined,
+                            size: 50,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.5),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 0.6, curve: Curves.easeOut)),
+                    ),
+                    child: FadeTransition(
+                      opacity: _logoFade,
+                      child: const Column(
+                        children: [
+                          Text(
+                            'NEBULA CODE',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 4,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'CRACK THE PATTERN',
+                            style: TextStyle(
+                              fontSize: 12,
+                              letterSpacing: 3,
+                              color: Color(0xFF6C63FF),
+                              fontWeight: FontWeight.w400,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Animated subtitle with slide
-                    SlideTransition(
-                      position: _slideAnimation,
-                      child: FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: const Text(
-                          'Train Your Executive Functions',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 60),
-
-              // Animated loading indicator
-              FadeTransition(
-                opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
-                  CurvedAnimation(
-                    parent: _animationController,
-                    curve: const Interval(0.5, 1.0),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    SizedBox(
+                  const SizedBox(height: 60),
+                  FadeTransition(
+                    opacity: Tween<double>(begin: 0, end: 1).animate(
+                      CurvedAnimation(parent: _controller, curve: const Interval(0.5, 0.8, curve: Curves.easeOut)),
+                    ),
+                    child: const SizedBox(
                       width: 40,
                       height: 40,
                       child: CircularProgressIndicator(
-                        color: Colors.cyan,
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.cyan.withValues(alpha: 0.8),
-                        ),
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Loading...',
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

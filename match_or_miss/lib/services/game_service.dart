@@ -36,7 +36,18 @@ class GameService {
 
   /// Generate available bottles for dragging (shuffled order)
   List<Bottle> generateAvailableBottles(List<Bottle> hidden) {
-    final shuffledHidden = List<Bottle>.from(hidden)..shuffle(Random());
+    final random = Random();
+    final shuffledHidden = List<Bottle>.from(hidden);
+    if (shuffledHidden.length > 1) {
+      // Keep shuffling until order differs from hidden (or until retry budget ends).
+      var retries = 0;
+      do {
+        shuffledHidden.shuffle(random);
+        retries++;
+      } while (retries < 12 &&
+          List.generate(shuffledHidden.length, (i) => shuffledHidden[i].color == hidden[i].color)
+              .every((same) => same));
+    }
     final result = <Bottle>[];
     for (int i = 0; i < shuffledHidden.length; i++) {
       result.add(Bottle(
