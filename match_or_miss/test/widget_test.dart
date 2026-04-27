@@ -9,11 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:match_or_miss/main.dart';
+import 'package:match_or_miss/services/openai_service.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp(initialApiKey: ''));
+    await tester.pumpWidget(MyApp(initialApiKey: '', initialProvider: AIProvider.openAI));
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

@@ -42,13 +42,18 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWeb = screenWidth > 1200;
+    final maxContentWidth = isWeb ? 900 : double.infinity;
+    final horizontalPadding = isWeb ? (screenWidth - maxContentWidth) / 2 : 22.0;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF09111F), Color(0xFF11243A), Color(0xFF1A3142)],
+            colors: [Color(0xFFFBF3D4), Color(0xFFF1D8B8), Color(0xFFDBE9C0)],
           ),
         ),
         child: SafeArea(
@@ -59,23 +64,22 @@ class _HomeScreenState extends State<HomeScreen>
                 _buildHeader(context),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(22, 16, 22, 24),
+                    padding: EdgeInsets.fromLTRB(
+                        horizontalPadding, 16, horizontalPadding, 24),
                     child: Column(
                       children: [
                         _buildHeroSection(),
                         const SizedBox(height: 14),
                         _buildAIStatus(context),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
                         _buildSectionTitle('Choose A Mode'),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         _buildModeCards(context),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 24),
                         _buildSectionTitle('More Ways To Play'),
-                        const SizedBox(height: 10),
-                        _buildMultiplayerButton(context),
-                        const SizedBox(height: 10),
-                        _buildAnalysisButton(context),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
+                        _buildActionButtons(context),
+                        const SizedBox(height: 16),
                         _buildSettingsButton(context),
                       ],
                     ),
@@ -96,15 +100,16 @@ class _HomeScreenState extends State<HomeScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
+            color: const Color(0xFFC5A7CD).withValues(alpha: 0.15),
             border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              bottom: BorderSide(
+                  color: const Color(0xFFC5A7CD).withValues(alpha: 0.2)),
             ),
           ),
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.settings, color: Colors.white),
+                icon: const Icon(Icons.settings, color: Color(0xFF5A4B66)),
                 onPressed: () => _showSettingsDialog(context),
               ),
               const Expanded(
@@ -112,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen>
                   'MATCH OR MISS',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xFFE9F5FF),
+                    color: Color(0xFF4A3856),
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 2,
@@ -120,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.leaderboard, color: Colors.white),
+                icon: const Icon(Icons.leaderboard, color: Color(0xFF5A4B66)),
                 onPressed: () => _showLeaderboard(context),
               ),
             ],
@@ -134,29 +139,23 @@ class _HomeScreenState extends State<HomeScreen>
     return GlassmorphicCard(
       padding: const EdgeInsets.all(18),
       borderRadius: 20,
-      border: Border.all(color: const Color(0xFF73C7FF).withValues(alpha: 0.3)),
+      border: Border.all(color: const Color(0xFFC5A7CD).withValues(alpha: 0.4)),
       child: Row(
         children: [
           TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.75, end: 1),
             duration: const Duration(milliseconds: 700),
             curve: Curves.elasticOut,
-            builder: (_, value, child) => Transform.scale(scale: value, child: child),
+            builder: (_, value, child) =>
+                Transform.scale(scale: value, child: child),
             child: Container(
               width: 74,
               height: 74,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const RadialGradient(
-                  colors: [Color(0xFF6DD3FF), Color(0xFF2A80C9)],
+                gradient: RadialGradient(
+                  colors: [Color(0xFFC5A7CD), Color(0xFFEEBBDD)],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6DD3FF).withValues(alpha: 0.45),
-                    blurRadius: 18,
-                    spreadRadius: 1,
-                  ),
-                ],
               ),
               child: const Icon(Icons.psychology, color: Colors.white, size: 40),
             ),
@@ -169,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(
                   'Train Your Brain',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF4A3856),
                     fontWeight: FontWeight.w800,
                     fontSize: 20,
                   ),
@@ -177,7 +176,8 @@ class _HomeScreenState extends State<HomeScreen>
                 SizedBox(height: 6),
                 Text(
                   'Memorize, swap, and solve under pressure with stylish cognitive challenges.',
-                  style: TextStyle(color: Colors.white70, height: 1.35, fontSize: 12.5),
+                  style: TextStyle(
+                      color: Color(0xFF6B5A72), height: 1.35, fontSize: 12.5),
                 ),
               ],
             ),
@@ -203,19 +203,18 @@ class _HomeScreenState extends State<HomeScreen>
               gradient: LinearGradient(
                 colors: hasKey
                     ? [
-                        Colors.green.withValues(alpha: 0.25),
-                        Colors.teal.withValues(alpha: 0.15),
+                        const Color(0xFFDBE9C0).withValues(alpha: 0.4),
+                        const Color(0xFFB7D9E2).withValues(alpha: 0.3),
                       ]
                     : [
-                        Colors.grey.withValues(alpha: 0.15),
-                        Colors.blueGrey.withValues(alpha: 0.1),
+                        const Color(0xFFEEBBDD).withValues(alpha: 0.25),
+                        const Color(0xFFC5A7CD).withValues(alpha: 0.2),
                       ],
-                begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: hasKey ? Colors.greenAccent : Colors.white24,
+                color: hasKey ? const Color(0xFF7A9A6C) : const Color(0xFF8B6B9E),
                 width: 1.4,
               ),
             ),
@@ -223,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen>
               children: [
                 Icon(
                   hasKey ? Icons.smart_toy : Icons.smart_toy_outlined,
-                  color: hasKey ? Colors.greenAccent : Colors.white38,
+                  color: hasKey ? const Color(0xFF7A9A6C) : const Color(0xFF8B6B9E),
                   size: 20,
                 ),
                 const SizedBox(width: 10),
@@ -231,9 +230,11 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Text(
                     hasKey
                         ? 'AI Coach connected — tap to change key'
-                        : 'Connect AI key for richer post-game insight',
+                        : 'Connect AI key for post-game insights',
                     style: TextStyle(
-                      color: hasKey ? Colors.greenAccent : Colors.white54,
+                      color: hasKey
+                          ? const Color(0xFF5A6B4F)
+                          : const Color(0xFF6B5A72),
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
                     ),
@@ -242,9 +243,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 13,
-                  color: hasKey
-                      ? Colors.greenAccent.withValues(alpha: 0.7)
-                      : Colors.white24,
+                  color: hasKey ? const Color(0xFF7A9A6C) : const Color(0xFF8B6B9E),
                 ),
               ],
             ),
@@ -260,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: Text(
         title,
         style: const TextStyle(
-          color: Color(0xFFBED6EA),
+          color: Color(0xFF5A4B66),
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
           fontSize: 12,
@@ -277,9 +276,9 @@ class _HomeScreenState extends State<HomeScreen>
           icon: Icons.flash_on,
           title: 'Quick Mode',
           subtitle: 'No Time Limit',
-          description: 'Starts at 3 bottles and adapts as you improve.',
+          description: 'Adaptive sequence starting at 3 bottles.',
           mode: GameMode.quick,
-          color: const Color(0xFF56D676),
+          color: const Color(0xFFDBE9C0),
         ),
         const SizedBox(height: 10),
         _buildModeCard(
@@ -287,9 +286,9 @@ class _HomeScreenState extends State<HomeScreen>
           icon: Icons.timer,
           title: 'Standard Mode',
           subtitle: '4 Minutes • 10 Moves',
-          description: 'Balanced challenge with clear pressure.',
+          description: 'Balanced challenge with measured pressure.',
           mode: GameMode.standard,
-          color: const Color(0xFF61B8FF),
+          color: const Color(0xFFB7D9E2),
         ),
         const SizedBox(height: 10),
         _buildModeCard(
@@ -299,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen>
           subtitle: '3 Minutes • Your Move Limit',
           description: 'Hardcore setup for high focus players.',
           mode: GameMode.competitive,
-          color: const Color(0xFFFFA15E),
+          color: const Color(0xFFEEBBDD),
         ),
       ],
     );
@@ -330,7 +329,8 @@ class _HomeScreenState extends State<HomeScreen>
       borderRadius: 16,
       border: Border.all(color: color.withValues(alpha: 0.35)),
       boxShadow: [
-        BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 14, spreadRadius: 1),
+        BoxShadow(
+            color: color.withValues(alpha: 0.18), blurRadius: 14, spreadRadius: 1),
       ],
       child: Row(
         children: [
@@ -354,11 +354,18 @@ class _HomeScreenState extends State<HomeScreen>
               children: [
                 Text(
                   title,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 15),
+                  style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15),
                 ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                Text(description, style: const TextStyle(color: Colors.white38, fontSize: 11.5)),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: Color(0xFF6B5A72), fontSize: 12)),
+                Text(description,
+                    style: const TextStyle(
+                        color: Color(0xFF9B8AA3), fontSize: 11.5)),
               ],
             ),
           ),
@@ -368,35 +375,37 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildMultiplayerButton(BuildContext context) {
-    return GradientButton(
-      label: 'Play Multiplayer',
-      gradient: const LinearGradient(
-        colors: [Color(0xFFFFA15E), Color(0xFFD46A2F)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      leftIcon: const Icon(Icons.groups_rounded, color: Colors.white),
-      onPressed: () => Navigator.push(
-        context,
-        SmoothPageTransition(page: const MultiplayerScreen()),
-      ),
-    );
-  }
-
-  Widget _buildAnalysisButton(BuildContext context) {
-    return GradientButton(
-      label: 'View Analysis',
-      gradient: const LinearGradient(
-        colors: [Color(0xFF4CC2DB), Color(0xFF2B89BC)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      leftIcon: const Icon(Icons.analytics_rounded, color: Colors.white),
-      onPressed: () => Navigator.push(
-        context,
-        SmoothPageTransition(page: const AnalysisScreen()),
-      ),
+  Widget _buildActionButtons(BuildContext context) {
+    return Column(
+      children: [
+        GradientButton(
+          label: 'Play Multiplayer',
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEEBBDD), Color(0xFFC5A7CD)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          leftIcon: const Icon(Icons.groups_rounded, color: Colors.white),
+          onPressed: () => Navigator.push(
+            context,
+            SmoothPageTransition(page: const MultiplayerScreen()),
+          ),
+        ),
+        const SizedBox(height: 10),
+        GradientButton(
+          label: 'View Analysis',
+          gradient: const LinearGradient(
+            colors: [Color(0xFFB7D9E2), Color(0xFF8BBFD4)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          leftIcon: const Icon(Icons.analytics_rounded, color: Colors.white),
+          onPressed: () => Navigator.push(
+            context,
+            SmoothPageTransition(page: const AnalysisScreen()),
+          ),
+        ),
+      ],
     );
   }
 
@@ -406,7 +415,8 @@ class _HomeScreenState extends State<HomeScreen>
       child: TextButton.icon(
         onPressed: () => _showSettingsDialog(context),
         icon: const Icon(Icons.tune_rounded, color: Colors.white60),
-        label: const Text('Game Settings', style: TextStyle(color: Colors.white60)),
+        label: const Text('Game Settings',
+            style: TextStyle(color: Colors.white60)),
       ),
     );
   }
@@ -422,13 +432,14 @@ class _HomeScreenState extends State<HomeScreen>
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF172534),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Competitive Mode', style: TextStyle(color: Colors.white)),
+        title: const Text('Competitive Mode',
+            style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
               'Choose move limit between 5 and 12',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: Color(0xFF6B5A72)),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -454,7 +465,8 @@ class _HomeScreenState extends State<HomeScreen>
             child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFA15E)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFA15E)),
             onPressed: () {
               final moves = int.tryParse(controller.text.trim());
               if (moves == null || moves < 5 || moves > 12) {
@@ -493,10 +505,12 @@ class _HomeScreenState extends State<HomeScreen>
               padding: const EdgeInsets.symmetric(vertical: 5),
               child: Row(
                 children: [
-                  Text('${i + 1}', style: const TextStyle(color: Colors.white70)),
+                  Text('${i + 1}',
+                      style: const TextStyle(color: Color(0xFF6B5A72))),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text('Player ${i + 1}', style: const TextStyle(color: Colors.white)),
+                    child: Text('Player ${i + 1}',
+                        style: const TextStyle(color: Colors.white)),
                   ),
                   const Text('---', style: TextStyle(color: Colors.white38)),
                 ],
@@ -507,7 +521,7 @@ class _HomeScreenState extends State<HomeScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+            child: const Text('Close', style: TextStyle(color: Color(0xFF6B5A72))),
           ),
         ],
       ),
@@ -536,9 +550,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _toggle('Sound Effects', Icons.volume_up, _sound, (v) => setState(() => _sound = v)),
-          _toggle('Background Music', Icons.music_note, _music, (v) => setState(() => _music = v)),
-          _toggle('Show AI Hints', Icons.psychology, _hints, (v) => setState(() => _hints = v)),
+          _toggle('Sound Effects', Icons.volume_up, _sound,
+              (v) => setState(() => _sound = v)),
+          _toggle('Background Music', Icons.music_note, _music,
+              (v) => setState(() => _music = v)),
+          _toggle('Show AI Hints', Icons.psychology, _hints,
+              (v) => setState(() => _hints = v)),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -557,7 +574,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.cyan),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
@@ -573,13 +591,19 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     );
   }
 
-  Widget _toggle(String label, IconData icon, bool value, ValueChanged<bool> onChange) {
+  Widget _toggle(String label, IconData icon, bool value,
+      ValueChanged<bool> onChange) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white70, size: 18),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: const TextStyle(color: Colors.white70))),
-        Switch(value: value, onChanged: onChange, activeColor: const Color(0xFF73C7FF)),
+        Icon(icon, color: const Color(0xFF6B5A72), size: 18),
+        const SizedBox(width: 12),
+        Expanded(
+            child: Text(label,
+                style: const TextStyle(color: Color(0xFF6B5A72)))),
+        Switch(
+            value: value,
+            onChanged: onChange,
+            activeColor: const Color(0xFFC5A7CD)),
       ],
     );
   }

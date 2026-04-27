@@ -60,7 +60,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF09111F), Color(0xFF10283D), Color(0xFF183948)],
+            colors: [Color(0xFFFBF3D4), Color(0xFFF1D8B8), Color(0xFFDBE9C0)],
           ),
         ),
         child: SafeArea(
@@ -74,7 +74,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
                       ? const Center(
                           child: GlowingProgressIndicator(
                             value: 0.7,
-                            color: Color(0xFF6DD3FF),
+                            color: Color(0xFFC5A7CD),
                             label: 'AI',
                           ),
                         )
@@ -97,14 +97,14 @@ class AnalysisScreenState extends State<AnalysisScreen>
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF4A3856)),
           ),
           const Expanded(
             child: Text(
               'PERFORMANCE ANALYSIS',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFF4A3856),
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.3,
                 fontSize: 15,
@@ -113,7 +113,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
           ),
           IconButton(
             onPressed: _loadAnalysis,
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF6DD3FF)),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFFC5A7CD)),
           ),
         ],
       ),
@@ -130,22 +130,22 @@ class AnalysisScreenState extends State<AnalysisScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.analytics_outlined, size: 62, color: Color(0xFF6DD3FF)),
+              const Icon(Icons.analytics_outlined, size: 62, color: Color(0xFFC5A7CD)),
               const SizedBox(height: 14),
               const Text(
                 'No Game Data Yet',
-                style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Color(0xFF4A3856), fontSize: 23, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Play a few rounds and your AI coach will generate personalized feedback.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, height: 1.4),
+                style: TextStyle(color: Color(0xFF6B5A72), height: 1.4),
               ),
               const SizedBox(height: 18),
               GradientButton(
                 label: 'Play Now',
-                gradient: const LinearGradient(colors: [Color(0xFF6DD3FF), Color(0xFF2A80C9)]),
+                gradient: const LinearGradient(colors: [Color(0xFFC5A7CD), Color(0xFFEEBBDD)]),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -230,7 +230,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
                 const Icon(Icons.repeat_rounded, color: Color(0xFFFFC37A)),
                 const SizedBox(width: 8),
                 const Expanded(
-                  child: Text('Repeated Mistakes', style: TextStyle(color: Colors.white70)),
+                  child: Text('Repeated Mistakes', style: TextStyle(color: Color(0xFF6B5A72))),
                 ),
                 Text(
                   _analysis!.repeatedMistakes.toString(),
@@ -268,7 +268,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
             const SizedBox(height: 6),
             Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 19)),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11), textAlign: TextAlign.center),
+            Text(label, style: const TextStyle(color: Color(0xFF6B5A72), fontSize: 11), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -305,7 +305,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
                   Expanded(
                     child: Text(
                       s.replaceFirst(RegExp(r'^\s*[•\-*]\s*'), ''),
-                      style: const TextStyle(color: Colors.white70, height: 1.35),
+                      style: const TextStyle(color: Color(0xFF6B5A72), height: 1.35),
                     ),
                   ),
                 ],
@@ -355,7 +355,7 @@ class AnalysisScreenState extends State<AnalysisScreen>
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(move.feedback, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+                    child: Text(move.feedback, style: const TextStyle(color: Color(0xFF6B5A72), fontSize: 12.5)),
                   ),
                   Icon(icon, color: color, size: 18),
                 ],

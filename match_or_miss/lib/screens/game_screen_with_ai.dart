@@ -19,7 +19,10 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     with TickerProviderStateMixin {
   bool _gameFinished = false;
   bool _resultShown = false;
+  bool _hasPlayerMoved = false;
   late AnimationController _pulseController;
+  late AnimationController _glowController;
+  late AnimationController _celebrationController;
 
   @override
   void initState() {
@@ -29,19 +32,34 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       vsync: this,
     )..repeat();
 
+    _glowController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _celebrationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
     Future.delayed(const Duration(milliseconds: 500), _checkGamePeriodically);
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _glowController.dispose();
+    _celebrationController.dispose();
     super.dispose();
   }
 
   void _checkGamePeriodically() {
     if (!mounted) return;
     final provider = context.read<GameProvider>();
-    provider.checkGameState();
+    final moves = provider.currentSession?.currentMoves ?? 0;
+    if (moves > 0) {
+      provider.checkGameState();
+    }
     if (!_gameFinished) {
       Future.delayed(const Duration(milliseconds: 300), _checkGamePeriodically);
     }
@@ -50,7 +68,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF0A0E1A),
       appBar: _buildAppBar(context),
       body: Consumer<GameProvider>(
         builder: (context, gameProvider, child) {
@@ -61,28 +79,29 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
 
           final mode = session.mode;
 
-          if (_resultShown && _gameFinished) {
-            _gameFinished = false;
-            _resultShown = false;
+          final moves = session.currentMoves;
+          if (moves > 0 && !_hasPlayerMoved) {
+            _hasPlayerMoved = true;
           }
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_resultShown && gameProvider.isSolved() && mounted) {
+            if (!_resultShown && _hasPlayerMoved && gameProvider.isSolved() && mounted) {
               _gameFinished = true;
               _resultShown = true;
+              _celebrationController.forward();
               _showResultDialog(gameProvider, won: true);
             }
           });
 
           return Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF09111F),
-                  Color(0xFF10283D),
-                  Color(0xFF183948),
+                  const Color(0xFF0A0E1A),
+                  const Color(0xFF1A1A2E),
+                  const Color(0xFF16213E),
                 ],
               ),
             ),
@@ -113,24 +132,49 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      backgroundColor: const Color(0xFF0E1D2D),
+      backgroundColor: const Color(0xFF1A1A2E).withValues(alpha: 0.8),
       title: const Text(
-        'Match or Miss',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        'MATCH OR MISS',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 2,
+          color: Color(0xFF9DDFFF),
+        ),
       ),
       centerTitle: true,
       elevation: 0,
       actions: [
         Consumer<GameProvider>(
-          builder: (context, gp, _) => IconButton(
-            icon: Icon(
-              gp.hasAIKey ? Icons.smart_toy : Icons.smart_toy_outlined,
-              color: gp.hasAIKey ? Colors.greenAccent : Colors.white38,
-            ),
-            tooltip: gp.hasAIKey ? 'AI connected' : 'Connect AI for insights',
-            onPressed: () => showDialog(
-              context: context,
-              builder: (_) => const APIKeyDialog(),
+          builder: (context, gp, _) => Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: gp.hasAIKey
+                      ? const Color(0xFF00D2FF).withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  border: Border.all(
+                    color: gp.hasAIKey
+                        ? const Color(0xFF00D2FF)
+                        : const Color(0xFF4A5568),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  gp.hasAIKey ? Icons.auto_awesome : Icons.smart_toy_outlined,
+                  color: gp.hasAIKey ? const Color(0xFF00D2FF) : const Color(0xFF718096),
+                  size: 22,
+                ),
+              ),
+              tooltip: gp.hasAIKey ? 'AI Coach Active' : 'Connect AI Coach',
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => const APIKeyDialog(),
+              ),
             ),
           ),
         ),
@@ -139,58 +183,78 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
   }
 
   Widget _buildHeader(GameProvider gameProvider, GameMode mode) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1A1A2E).withValues(alpha: 0.7),
+            const Color(0xFF0F0F1A).withValues(alpha: 0.5),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF2D2D44).withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          Row(
+            children: [
+              _buildStatBadge(
+                label: 'MOVES',
+                value: gameProvider.currentSession?.currentMoves ?? 0,
+                color: const Color(0xFF00D2FF),
+              ),
+              const SizedBox(width: 20),
+              _buildStatBadge(
+                label: 'SCORE',
+                value: gameProvider.currentSession?.currentScore ?? 0,
+                color: const Color(0xFF7CFFB2),
+              ),
+            ],
+          ),
+          const TimerWidget(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatBadge({required String label, required int value, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Moves ',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
-                    AnimatedCounter(
-                      value: gameProvider.currentSession?.currentMoves ?? 0,
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        color: Color(0xFF6DD3FF),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Text(
-                      'Score ',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
-                    AnimatedCounter(
-                      value: gameProvider.currentSession?.currentScore ?? 0,
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFFFFC37A),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+          ),
+          const SizedBox(height: 2),
+          AnimatedCounter(
+            value: value,
+            textStyle: TextStyle(
+              fontSize: 22,
+              color: color,
+              fontWeight: FontWeight.bold,
+              shadows: [
+                Shadow(color: color.withValues(alpha: 0.5), blurRadius: 4),
               ],
             ),
           ),
-          const TimerWidget(),
         ],
       ),
     );
@@ -201,81 +265,129 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     final modeColor = _getModeColor(mode);
 
     return ScaleTransition(
-      scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-        CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+      scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+        CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutSine),
       ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              modeColor.withValues(alpha: 0.28),
-              modeColor.withValues(alpha: 0.08),
+              modeColor.withValues(alpha: 0.2),
+              modeColor.withValues(alpha: 0.05),
             ],
           ),
-          border: Border.all(color: modeColor.withValues(alpha: 0.7), width: 1.5),
-          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: modeColor.withValues(alpha: 0.6), width: 1.2),
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: modeColor.withValues(alpha: 0.25),
-              blurRadius: 12,
-              spreadRadius: 1,
+              color: modeColor.withValues(alpha: 0.15),
+              blurRadius: 16,
+              spreadRadius: 0,
             ),
           ],
         ),
-        child: Text(
-          '$modeText MODE',
-          style: TextStyle(
-            color: modeColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-            letterSpacing: 1.2,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_getModeIcon(mode), color: modeColor, size: 14),
+            const SizedBox(width: 8),
+            Text(
+              '$modeText MODE',
+              style: TextStyle(
+                color: modeColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  IconData _getModeIcon(GameMode mode) {
+    switch (mode) {
+      case GameMode.quick:
+        return Icons.flash_on;
+      case GameMode.standard:
+        return Icons.timer;
+      case GameMode.competitive:
+        return Icons.emoji_events;
+    }
+  }
+
   Color _getModeColor(GameMode mode) {
     switch (mode) {
       case GameMode.quick:
-        return Colors.greenAccent;
+        return const Color(0xFF7CFFB2);
       case GameMode.standard:
-        return Colors.blueAccent;
+        return const Color(0xFF00D2FF);
       case GameMode.competitive:
-        return Colors.redAccent;
+        return const Color(0xFFFF6B6B);
     }
   }
 
   Widget _buildCompetitiveBar(GameSession session) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF875A).withValues(alpha: 0.12),
-        border: Border.all(color: const Color(0xFFFFA15E), width: 1),
-        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFF6B6B).withValues(alpha: 0.15),
+            const Color(0xFFFF6B6B).withValues(alpha: 0.05),
+          ],
+        ),
+        border: Border.all(color: const Color(0xFFFF6B6B), width: 1),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'COMPETITIVE MODE',
-            style: TextStyle(
-              color: Color(0xFFFFC37A),
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.whatshot, color: Color(0xFFFF6B6B), size: 16),
+              const SizedBox(width: 8),
+              const Text(
+                'COMPETITIVE',
+                style: TextStyle(
+                  color: Color(0xFFFFA0A0),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
           ),
-          Text(
-            'Time Left: ${session.remainingTime}s',
-            style: TextStyle(
-              color: session.remainingTime < 10
-                  ? const Color(0xFFFF7A7A)
-                  : const Color(0xFFFFC37A),
-              fontWeight: FontWeight.bold,
-            ),
+          AnimatedBuilder(
+            animation: _glowController,
+            builder: (context, child) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: session.remainingTime < 10
+                      ? const Color(0xFFFF6B6B).withValues(alpha: 0.2)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${session.remainingTime}s',
+                  style: TextStyle(
+                    color: session.remainingTime < 10
+                        ? const Color(0xFFFF6B6B)
+                        : const Color(0xFFFFA0A0),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    shadows: session.remainingTime < 10
+                        ? [Shadow(color: const Color(0xFFFF6B6B).withValues(alpha: 0.5), blurRadius: 8)]
+                        : null,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -284,61 +396,84 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
 
   Widget _buildHiddenSequenceBox(List<Bottle> hiddenSequence, bool revealed) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1A1A2E).withValues(alpha: 0.8),
+            const Color(0xFF0F0F1A).withValues(alpha: 0.6),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: revealed
+              ? const Color(0xFF7CFFB2).withValues(alpha: 0.5)
+              : const Color(0xFF2D2D44).withValues(alpha: 0.5),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                revealed ? Icons.lock_open_rounded : Icons.lock_rounded,
-                color: revealed ? const Color(0xFF56D676) : const Color(0xFF9DDFFF),
-                size: 16,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: revealed
+                      ? const Color(0xFF7CFFB2).withValues(alpha: 0.2)
+                      : Colors.transparent,
+                ),
+                child: Icon(
+                  revealed ? Icons.visibility : Icons.visibility_off,
+                  color: revealed ? const Color(0xFF7CFFB2) : const Color(0xFF4A5568),
+                  size: 16,
+                ),
               ),
               const SizedBox(width: 8),
               Text(
-                revealed
-                    ? 'Hidden Sequence Revealed'
-                    : 'Hidden Sequence Box (Locked)',
+                revealed ? 'SECRET SEQUENCE' : '?? LOCKED PATTERN ??',
                 style: TextStyle(
-                  color: revealed ? const Color(0xFF56D676) : const Color(0xFF9DDFFF),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  color: revealed ? const Color(0xFF7CFFB2) : const Color(0xFF4A5568),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: List.generate(hiddenSequence.length, (index) {
                 final bottle = hiddenSequence[index];
-                return Container(
-                  width: 30,
-                  height: 34,
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
                   margin: const EdgeInsets.only(right: 8),
+                  width: 32,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: revealed
-                        ? bottle.color
-                        : Colors.white.withValues(alpha: 0.1),
+                        ? bottle.color.withValues(alpha: 0.85)
+                        : const Color(0xFF2D2D44).withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: revealed
-                          ? Colors.white.withValues(alpha: 0.45)
-                          : Colors.white.withValues(alpha: 0.2),
+                          ? bottle.color
+                          : const Color(0xFF4A5568),
+                      width: 1.5,
                     ),
                   ),
                   child: Center(
-                    child: revealed
-                        ? const Icon(Icons.local_drink, size: 14, color: Colors.white)
-                        : const Icon(Icons.help_outline, size: 14, color: Colors.white54),
+                    child: Icon(
+                      Icons.local_drink,
+                      size: 16,
+                      color: revealed ? Colors.white : const Color(0xFF4A5568),
+                    ),
                   ),
                 );
               }),
@@ -358,49 +493,75 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeOutCubic,
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isSolved
-            ? const Color(0xFF56D676).withValues(alpha: 0.15)
-            : const Color(0xFF6DD3FF).withValues(alpha: 0.12),
+        gradient: isSolved
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF7CFFB2).withValues(alpha: 0.12),
+                  Colors.transparent,
+                ],
+              )
+            : null,
+        color: const Color(0xFF1A1A2E).withValues(alpha: 0.4),
         border: Border.all(
-          color: isSolved ? const Color(0xFF56D676) : const Color(0xFF6DD3FF),
-          width: 1.6,
+          color: isSolved
+              ? const Color(0xFF7CFFB2).withValues(alpha: 0.6)
+              : const Color(0xFF2D2D44).withValues(alpha: 0.4),
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isSolved
-                ? const Color(0xFF56D676).withValues(alpha: 0.45)
-                : Colors.transparent,
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
           AnimatedScale(
             scale: isSolved ? 1.1 : 1.0,
-            duration: const Duration(milliseconds: 600),
-            child: Text(
-              isSolved ? '🎉 SOLVED!' : 'Correct Matches',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isSolved ? const Color(0xFF56D676) : const Color(0xFF9DDFFF),
+            duration: const Duration(milliseconds: 400),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSolved
+                    ? const Color(0xFF7CFFB2).withValues(alpha: 0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                isSolved ? '✨ PERFECT MATCH! ✨' : 'MATCH PROGRESS',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: isSolved ? const Color(0xFF7CFFB2) : const Color(0xFF00D2FF),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 500),
-            style: TextStyle(
-              fontSize: isSolved ? 32 : 28,
-              fontWeight: FontWeight.bold,
-              color: isSolved ? const Color(0xFF56D676) : Colors.white,
-            ),
-            child: Text('$currentMatches / $maxMatches'),
+          const SizedBox(height: 12),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 100,
+                height: 100,
+                child: CircularProgressIndicator(
+                  value: currentMatches / maxMatches,
+                  strokeWidth: 6,
+                  backgroundColor: const Color(0xFF2D2D44),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isSolved ? const Color(0xFF7CFFB2) : const Color(0xFF00D2FF),
+                  ),
+                ),
+              ),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 300),
+                style: TextStyle(
+                  fontSize: isSolved ? 26 : 22,
+                  fontWeight: FontWeight.bold,
+                  color: isSolved ? const Color(0xFF7CFFB2) : Colors.white,
+                ),
+                child: Text('$currentMatches/$maxMatches'),
+              ),
+            ],
           ),
         ],
       ),
@@ -409,6 +570,10 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
 
   Widget _buildDraggableBottles(GameProvider gameProvider) {
     final total = gameProvider.currentGuessSlots.length;
+    if (total <= 0) {
+      return const Expanded(child: SizedBox.shrink());
+    }
+
     final viewportWidth = MediaQuery.of(context).size.width;
 
     int columns;
@@ -423,6 +588,7 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     } else {
       columns = total <= 2 ? total : 3;
     }
+    columns = columns.clamp(1, 8);
 
     final compactDesignWidth = (columns * 82.0) + ((columns - 1) * 12);
     final availableWidth = viewportWidth - 32;
@@ -433,28 +599,37 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
     final cellWidth = (maxGridWidth - ((columns - 1) * 12)) / columns;
     var bottleSize = cellWidth * 0.46;
     bottleSize = bottleSize.clamp(26.0, 38.0);
-    final cellHeight = bottleSize * 1.34;
+    final cellHeight = bottleSize * 1.54;
 
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           children: [
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF6DD3FF), Color(0xFFB7EBFF)],
-              ).createShader(bounds),
-              child: const Text(
-                'Drag bottle assets into the sequence grid',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00D2FF).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.touch_app, color: Color(0xFF00D2FF), size: 12),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Drag & drop to rearrange',
+                    style: TextStyle(
+                      color: const Color(0xFF00D2FF),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Expanded(
               child: Center(
                 child: ConstrainedBox(
@@ -500,9 +675,9 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       duration: Duration(milliseconds: 300 + (index * 50)),
       curve: Curves.easeOutBack,
       builder: (context, value, child) {
-        return ScaleTransition(
-          scale: AlwaysStoppedAnimation(value),
-          child: FadeTransition(opacity: AlwaysStoppedAnimation(value), child: child),
+        return Transform.scale(
+          scale: value,
+          child: Opacity(opacity: value, child: child),
         );
       },
       child: _buildDraggableBottle(bottle, index, gameProvider, bottleSize),
@@ -529,25 +704,50 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             color: Colors.transparent,
             child: ScaleTransition(
               scale: const AlwaysStoppedAnimation(1.15),
-              child: BottleWidget(
-                bottle: bottle,
-                size: bottleSize,
-                isDragging: true,
+              child: Container(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: bottle.color.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: BottleWidget(
+                  bottle: bottle,
+                  size: bottleSize,
+                  isDragging: true,
+                ),
               ),
             ),
           ),
           childWhenDragging: SizedBox(
             width: bottleSize,
-            height: bottleSize * 1.3,
+            height: bottleSize * 1.54,
             child: Opacity(
-              opacity: 0.4,
+              opacity: 0.3,
               child: BottleWidget(bottle: bottle, size: bottleSize),
             ),
           ),
           child: AnimatedScale(
             scale: candidateData.isNotEmpty ? 1.05 : 1.0,
-            duration: const Duration(milliseconds: 200),
-            child: BottleWidget(bottle: bottle, size: bottleSize),
+            duration: const Duration(milliseconds: 150),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: candidateData.isNotEmpty
+                    ? [
+                        BoxShadow(
+                          color: bottle.color.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: BottleWidget(bottle: bottle, size: bottleSize),
+            ),
           ),
         );
       },
@@ -559,48 +759,60 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SizedBox(
         width: double.infinity,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFA15E), Color(0xFFD46A2F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFFA15E).withValues(alpha: 0.35),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: gameProvider.resetGuess,
-              borderRadius: BorderRadius.circular(12),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 14),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.restart_alt, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      'Reset Guess',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+        child: AnimatedBuilder(
+          animation: _glowController,
+          builder: (context, child) {
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF2D2D44),
+                    const Color(0xFF1A1A2E),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: const Color(0xFF00D2FF).withValues(alpha: 0.4 + _glowController.value * 0.2),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00D2FF).withValues(alpha: 0.1),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: gameProvider.resetGuess,
+                  borderRadius: BorderRadius.circular(30),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.refresh_rounded, color: Color(0xFF00D2FF), size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'Reset Sequence',
+                          style: TextStyle(
+                            color: Color(0xFF00D2FF),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -614,13 +826,26 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
       context: parentContext,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1a2e),
-        title: Text(
-          won ? '🎉 Congratulations!' : '😢 Game Over',
-          style: TextStyle(
-            color: won ? Colors.greenAccent : Colors.redAccent,
-            fontWeight: FontWeight.bold,
-          ),
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(
+              won ? Icons.emoji_events : Icons.sentiment_dissatisfied,
+              color: won ? const Color(0xFF7CFFB2) : const Color(0xFFFF6B6B),
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              won ? 'VICTORY!' : 'GAME OVER',
+              style: TextStyle(
+                color: won ? const Color(0xFF7CFFB2) : const Color(0xFFFF6B6B),
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -629,37 +854,53 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
             children: [
               if (hiddenSequence.isNotEmpty) ...[
                 const Text(
-                  'Hidden Sequence',
+                  'THE SECRET PATTERN',
                   style: TextStyle(
-                    color: Color(0xFF9DDFFF),
+                    color: Color(0xFF00D2FF),
                     fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                    letterSpacing: 1,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: List.generate(hiddenSequence.length, (index) {
                       final bottle = hiddenSequence[index];
                       return Container(
-                        width: 30,
-                        height: 34,
-                        margin: const EdgeInsets.only(right: 8),
+                        width: 40,
+                        height: 44,
+                        margin: const EdgeInsets.only(right: 10),
                         decoration: BoxDecoration(
                           color: bottle.color,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white38),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white24, width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: bottle.color.withValues(alpha: 0.4),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.local_drink, size: 14, color: Colors.white),
+                        child: const Icon(Icons.local_drink, size: 18, color: Colors.white),
                       );
                     }),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
               ],
-              Text(
-                gp.postGameInsight,
-                style: const TextStyle(color: Colors.white, height: 1.5),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0F1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2D2D44)),
+                ),
+                child: Text(
+                  gp.postGameInsight,
+                  style: const TextStyle(color: Color(0xFFA0A0B0), height: 1.5, fontSize: 13),
+                ),
               ),
               if (gp.isLoadingInsight)
                 const Padding(
@@ -671,13 +912,13 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00D2FF)),
                         ),
                       ),
-                      SizedBox(width: 8),
+                      SizedBox(width: 10),
                       Text(
-                        'Getting AI insights...',
-                        style: TextStyle(color: Colors.cyanAccent, fontSize: 12),
+                        'Analyzing your performance...',
+                        style: TextStyle(color: Color(0xFF00D2FF), fontSize: 12),
                       ),
                     ],
                   ),
@@ -694,15 +935,32 @@ class GameScreenWithAIState extends State<GameScreenWithAI>
               provider.initializeGame(nextMode);
               _gameFinished = false;
               _resultShown = false;
+              _hasPlayerMoved = false;
+              _celebrationController.reset();
             },
-            child: const Text('Next Game'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00D2FF), Color(0xFF0077B6)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Text(
+                'PLAY AGAIN',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext);
               Navigator.pop(parentContext);
             },
-            child: const Text('Back to Home'),
+            child: const Text(
+              'EXIT',
+              style: TextStyle(color: Color(0xFF4A5568), fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),

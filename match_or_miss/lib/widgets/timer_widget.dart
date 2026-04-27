@@ -55,7 +55,7 @@ class TimerWidgetState extends State<TimerWidget> {
         // Standard & Competitive modes: show stopwatch (elapsed time)
         Duration duration = Duration(seconds: _elapsedSeconds);
         String timeString = _formatDuration(duration);
-        Color timerColor = mode == GameMode.standard ? Colors.blueAccent : Colors.redAccent;
+        Color timerColor = mode == GameMode.standard ? const Color(0xFFB7D9E2) : const Color(0xFFEEBBDD);
         return _buildTimerContainer(timeString, timerColor);
       },
     );

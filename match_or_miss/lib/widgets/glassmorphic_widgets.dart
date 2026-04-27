@@ -103,10 +103,10 @@ class _GlassmorphicCardState extends State<GlassmorphicCard>
                   child: Container(
                     padding: widget.padding,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: const Color(0xFFC5A7CD).withValues(alpha: 0.06),
                       border: widget.border ??
                           Border.all(
-                            color: Colors.cyan.withValues(alpha: 0.2),
+                            color: const Color(0xFFC5A7CD).withValues(alpha: 0.2),
                             width: 1.5,
                           ),
                       borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -208,7 +208,7 @@ class _GradientButtonState extends State<GradientButton>
                 borderRadius: BorderRadius.circular(widget.borderRadius),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.cyan.withValues(
+                    color: const Color(0xFFC5A7CD).withValues(
                       alpha: 0.3 + (_scaleAnimation.value - 0.95) * 5,
                     ),
                     blurRadius: 20,
@@ -234,7 +234,7 @@ class _GradientButtonState extends State<GradientButton>
                           widget.label,
                           style: widget.textStyle ??
                               const TextStyle(
-                                color: Colors.white,
+                                color: Color(0xFF4A3856),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                                 letterSpacing: 1,
