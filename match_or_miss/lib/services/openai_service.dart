@@ -2,24 +2,29 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/game_models.dart';
 
 enum AIProvider {
   openAI,
   anthropic, // Claude
   googleGemini,
+  grok,       // xAI Grok
   customAPI,
 }
 
 class OpenAIService {
   String? _apiKey;
+  String? _geminiKey; // For dual-key fallback
+  String? _openaiKey; // For dual-key fallback
   AIProvider _currentProvider = AIProvider.openAI;
 
   final Map<AIProvider, String> _apiEndpoints = {
     AIProvider.openAI: 'https://api.openai.com/v1/chat/completions',
     AIProvider.anthropic: 'https://api.anthropic.com/v1/messages',
     AIProvider.googleGemini:
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    AIProvider.grok: 'https://api.x.ai/v1/chat/completions',
   };
 
   static const Duration _timeout = Duration(seconds: 15);
@@ -30,7 +35,15 @@ class OpenAIService {
   }
 
   bool get hasValidKey {
-    return _apiKey != null && _apiKey!.isNotEmpty;
+    return (_apiKey != null && _apiKey!.isNotEmpty) ||
+           (_geminiKey != null && _geminiKey!.isNotEmpty) ||
+           (_openaiKey != null && _openaiKey!.isNotEmpty);
+  }
+
+  /// Set both Gemini and OpenAI keys for automatic fallback
+  void setDualKeys({String? geminiKey, String? openaiKey}) {
+    if (geminiKey != null && geminiKey.isNotEmpty) _geminiKey = geminiKey.trim();
+    if (openaiKey != null && openaiKey.isNotEmpty) _openaiKey = openaiKey.trim();
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -116,13 +129,41 @@ Respond ONLY with valid JSON (no markdown, no explanation):
 
   // ─── Router ────────────────────────────────────────────────────────────────
 
-  Future<String> _dispatch(String prompt) {
-    switch (_currentProvider) {
-      case AIProvider.openAI:       return _callOpenAI(prompt);
-      case AIProvider.anthropic:    return _callAnthropic(prompt);
-      case AIProvider.googleGemini: return _callGemini(prompt);
-      case AIProvider.customAPI:    return _callCustomAPI(prompt);
+  Future<String> _dispatch(String prompt) async {
+    // Single-provider mode (key set via setApiKey)
+    if (_apiKey != null && _apiKey!.isNotEmpty) {
+      switch (_currentProvider) {
+        case AIProvider.openAI:       return _callOpenAI(prompt);
+        case AIProvider.anthropic:    return _callAnthropic(prompt);
+        case AIProvider.googleGemini: return _callGemini(prompt);
+        case AIProvider.grok:         return _callGrok(prompt);
+        case AIProvider.customAPI:    return _callCustomAPI(prompt);
+      }
     }
+
+    // Dual-key fallback mode: Gemini first, then OpenAI
+    if (_geminiKey != null && _geminiKey!.isNotEmpty) {
+      try {
+        final saved = _apiKey;
+        _apiKey = _geminiKey;
+        _currentProvider = AIProvider.googleGemini;
+        final result = await _callGemini(prompt);
+        _apiKey = saved;
+        return result;
+      } catch (_) {
+        // Gemini failed — try OpenAI
+      }
+    }
+    if (_openaiKey != null && _openaiKey!.isNotEmpty) {
+      final saved = _apiKey;
+      _apiKey = _openaiKey;
+      _currentProvider = AIProvider.openAI;
+      final result = await _callOpenAI(prompt);
+      _apiKey = saved;
+      return result;
+    }
+
+    throw Exception('No valid AI keys configured');
   }
 
   // ─── Provider calls ────────────────────────────────────────────────────────
@@ -186,6 +227,9 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   }
 
   Future<String> _callGemini(String prompt) async {
+    // On web, route through local proxy to avoid CORS
+    if (kIsWeb) return _callGeminiViaProxy(prompt);
+
     if (_apiKey == null || _apiKey!.isEmpty) {
       throw Exception('Gemini API key not configured. Get a free key from Google AI Studio');
     }
@@ -201,7 +245,7 @@ Respond ONLY with valid JSON (no markdown, no explanation):
           }
         ],
         'generationConfig': {
-          'maxOutputTokens': 200,
+          'maxOutputTokens': 400,
           'temperature': 0.7,
         },
       }),
@@ -212,6 +256,75 @@ Respond ONLY with valid JSON (no markdown, no explanation):
       return (data['candidates'][0]['content']['parts'][0]['text'] as String).trim();
     }
     throw Exception('Gemini error ${response.statusCode}: ${response.body}');
+  }
+
+  Future<String> _callGeminiViaProxy(String prompt) async {
+    const proxyUrl = 'http://localhost:3000/ai';
+    final response = await http.post(
+      Uri.parse(proxyUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'prompt': prompt}),
+    ).timeout(_timeout);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['insight'] as String).trim();
+    }
+    throw Exception('Gemini proxy error ${response.statusCode}: ${response.body}');
+  }
+
+
+  Future<String> _callGrok(String prompt) async {
+    // On web: call local proxy to avoid CORS restrictions
+    // On mobile/desktop: call Grok directly
+    if (kIsWeb) {
+      return _callGrokViaProxy(prompt);
+    }
+
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('Grok API key not configured. Get one at console.x.ai');
+    }
+    final response = await http.post(
+      Uri.parse(_apiEndpoints[AIProvider.grok]!),
+      headers: {
+        'Authorization': 'Bearer \$_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'grok-3',
+        'messages': [
+          {
+            'role': 'system',
+            'content': 'You are a cognitive training expert. Provide concise, actionable feedback for a puzzle game.',
+          },
+          {'role': 'user', 'content': prompt},
+        ],
+        'max_tokens': 200,
+        'temperature': 0.7,
+      }),
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['choices'][0]['message']['content'] as String).trim();
+    }
+    throw Exception('Grok error \${response.statusCode}: \${response.body}');
+  }
+
+  Future<String> _callGrokViaProxy(String prompt) async {
+    // Calls the local Node.js proxy server which forwards to Gemini
+    // Start proxy: GEMINI_API_KEY=your-key node server.js
+    const proxyUrl = 'http://localhost:3000/ai';
+    final response = await http.post(
+      Uri.parse(proxyUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'prompt': prompt}),
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['insight'] as String).trim();
+    }
+    throw Exception('Proxy error \${response.statusCode}: \${response.body}');
   }
 
   Future<String> _callCustomAPI(String prompt) async {
@@ -239,32 +352,12 @@ Respond ONLY with valid JSON (no markdown, no explanation):
 
   String _buildCompletionPrompt(List<Attempt> attempts, int score, int moves, int timeSpent) {
     final sequenceLength = _sequenceLengthFromAttempts(attempts);
-    return '''You are a cognitive coach analyzing a player's puzzle-solving strategy in "Match or Miss" (a $sequenceLength-bottle color sequence puzzle).
-
-PLAYER PERFORMANCE:
-- Final Score: $score
-- Moves Used: $moves
-- Time Spent: ${timeSpent ~/ 60}m ${timeSpent % 60}s
-- Total Attempts: ${attempts.length}
-
-MOVE ANALYSIS:
-${_formatAttemptHistory(attempts)}
-
-STRATEGY METRICS:
-- Average bottles changed per move: ${_calculateAvgChanges(attempts).toStringAsFixed(1)}
-- Impulsive moves (>3 changes with no improvement): ${_countImpulsiveMoves(attempts)}
-- Progress rate: ${_calculateProgressRate(attempts).toStringAsFixed(2)} matches per move
-- Peak performance: ${attempts.isEmpty ? 0 : attempts.map((a) => a.matches).reduce((a, b) => a > b ? a : b)}/$sequenceLength matches
-
-FEEDBACK FOCUS: Analyze their decision-making patterns and how they can improve.
-
-Write 4-5 sentences covering:
-1. What their move pattern reveals about their thinking strategy (methodical vs impulsive)
-2. One specific strength they demonstrated
-3. One area to improve in their approach
-4. A concrete, actionable tip for better performance next time
-
-Write as flowing sentences, no bullet points. Be encouraging but honest.''';
+    final avgChanges = _calculateAvgChanges(attempts).toStringAsFixed(1);
+    final impulsive = _countImpulsiveMoves(attempts);
+    final progressRate = _calculateProgressRate(attempts).toStringAsFixed(2);
+    final peak = attempts.isEmpty ? 0 : attempts.map((a) => a.matches).reduce((a, b) => a > b ? a : b);
+    final won = attempts.isNotEmpty && attempts.last.matches == sequenceLength;
+    return 'Game coach feedback for Match or Miss puzzle. Stats: ${won ? "WON" : "LOST"}, $score pts, $moves swaps, best $peak/$sequenceLength, $impulsive impulsive moves, avg $avgChanges changed/swap. Write exactly 2 sentences under 30 words total using their exact numbers. Be casual, end with a tip.';
   }
 
   String _buildHintPrompt(List<Attempt> attempts, int currentMatches, int movesLeft, int timeRemaining, String? playerId) {

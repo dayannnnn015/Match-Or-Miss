@@ -22,6 +22,8 @@ class GameProvider extends ChangeNotifier {
         return 'anthropic';
       case ai_svc.AIProvider.googleGemini:
         return 'gemini';
+      case ai_svc.AIProvider.grok:
+        return 'grok';
       case ai_svc.AIProvider.customAPI:
         return 'custom';
     }
@@ -79,6 +81,27 @@ class GameProvider extends ChangeNotifier {
   void setAIApiKey(String apiKey,
       {ai_svc.AIProvider provider = ai_svc.AIProvider.openAI}) {
     _openAIService.setApiKey(apiKey, provider: provider);
+    notifyListeners();
+  }
+
+  /// Set both Gemini and OpenAI keys for automatic fallback (used by APIKeyDialog)
+  Future<void> setDualAIKeys({
+    String geminiKey = '',
+    String openaiKey = '',
+  }) async {
+    _openAIService.setDualKeys(
+      geminiKey: geminiKey.trim(),
+      openaiKey: openaiKey.trim(),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    if (geminiKey.trim().isNotEmpty) {
+      await prefs.setString('gemini_api_key', geminiKey.trim());
+      if (!kIsWeb) await SecureStorageService.saveAPIKey('gemini', geminiKey.trim());
+    }
+    if (openaiKey.trim().isNotEmpty) {
+      await prefs.setString('openai_api_key', openaiKey.trim());
+      if (!kIsWeb) await SecureStorageService.saveAPIKey('openai', openaiKey.trim());
+    }
     notifyListeners();
   }
 
@@ -235,35 +258,55 @@ class GameProvider extends ChangeNotifier {
       _postGameInsight = '🔄 Analyzing your performance...';
       notifyListeners();
 
+      print('🤖 Calling AI for post-game feedback...');
       final timeSpent = DateTime.now().difference(session.startTime).inSeconds;
 
-      _openAIService
-          .getGameCompletionFeedback(
-            attempts: session.attempts,
-            score: session.currentScore,
-            moves: session.currentMoves,
-            timeSpent: timeSpent,
-          )
-          .then((aiInsight) {
-            if (aiInsight.isNotEmpty) {
-              _postGameInsight = aiInsight;
-            } else {
-              _postGameInsight = _buildLocalInsight();
-            }
-            _isLoadingInsight = false;
-            notifyListeners();
-          })
-          .catchError((e) {
-            // API failed — fall back to local
-            _postGameInsight = _buildLocalInsight();
-            _isLoadingInsight = false;
-            notifyListeners();
-          });
+      // Use async/await in a separate function for reliable web support
+      _fetchAndApplyInsight(session, timeSpent);
     } else {
-      // No API key — use local fallback
+      print('⚠️ No valid AI key — using local fallback');
       _postGameInsight = _buildLocalInsight();
       notifyListeners();
     }
+  }
+
+  // How long to wait for AI before showing fallback (seconds)
+  static const int _aiTimeoutSeconds = 8;
+
+  Future<void> _fetchAndApplyInsight(dynamic session, int timeSpent) async {
+    // Start a fallback timer — if AI takes too long, show local insight
+    Future.delayed(const Duration(seconds: _aiTimeoutSeconds), () {
+      if (_isLoadingInsight) {
+        print('⏱️ AI timeout — showing local fallback after ${_aiTimeoutSeconds}s');
+        _postGameInsight = _buildLocalInsight();
+        _isLoadingInsight = false;
+        notifyListeners();
+      }
+    });
+
+    try {
+      final aiInsight = await _openAIService.getGameCompletionFeedback(
+        attempts: session.attempts,
+        score: session.currentScore,
+        moves: session.currentMoves,
+        timeSpent: timeSpent,
+      );
+      print('✅ AI responded successfully');
+      print('📝 AI text (FULL): ' + aiInsight);
+      if (aiInsight.isNotEmpty) {
+        _postGameInsight = aiInsight;
+        print('✅ Showing REAL AI feedback');
+      } else {
+        print('⚠️ AI returned empty — using local fallback');
+        _postGameInsight = _buildLocalInsight();
+      }
+    } catch (e) {
+      print('❌ AI call failed: \$e');
+      if (_isLoadingInsight) _postGameInsight = _buildLocalInsight();
+    }
+    _isLoadingInsight = false;
+    print('🔔 calling notifyListeners()');
+    notifyListeners();
   }
 
   // ─── Local fallback ────────────────────────────────────────────────────────
