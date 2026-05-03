@@ -10,11 +10,30 @@ import 'providers/ai_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/openai_service.dart' as ai_svc;
 import 'services/secure_storage_service.dart';
+import 'services/firebase_service.dart';
+import 'firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase - REAL-TIME DATA
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('✅ Firebase initialized successfully');
+    
+    // Sign in anonymously to establish real user ID
+    final firebaseService = FirebaseService();
+    final userId = await firebaseService.signInAnonymously();
+    print('✅ User authenticated with ID: $userId');
+  } catch (e) {
+    print('⚠️ Firebase initialization failed: $e');
+    print('ℹ️ Make sure to configure Firebase credentials in firebase_options.dart');
+  }
 
   String? savedKey;
   ai_svc.AIProvider savedProvider = ai_svc.AIProvider.openAI;

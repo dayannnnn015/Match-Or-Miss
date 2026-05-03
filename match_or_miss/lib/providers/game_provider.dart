@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/game_models.dart';
 import '../utils/constants.dart';
 import '../services/game_service.dart';
+import '../services/firebase_service.dart';
 import '../services/openai_service.dart' as ai_svc;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -10,6 +11,7 @@ import '../services/secure_storage_service.dart';
 
 class GameProvider extends ChangeNotifier {
   final GameService _gameService = GameService();
+  final FirebaseService _firebaseService = FirebaseService();
   final ai_svc.OpenAIService _openAIService = ai_svc.OpenAIService();
 
   static String _providerKey(ai_svc.AIProvider provider) {
@@ -386,6 +388,79 @@ class GameProvider extends ChangeNotifier {
       _currentSession!.status = GameStatus.timeout;
     }
     notifyListeners();
+  }
+
+  /// Save current game result to Firebase in real-time
+  /// Called when game is completed (won or lost)
+  Future<void> saveGameResult({required bool won}) async {
+    if (_currentSession == null) return;
+
+    try {
+      final userId = _firebaseService.getCurrentUserId();
+      if (userId == null || userId.isEmpty) {
+        print('User not authenticated. Cannot save game result.');
+        return;
+      }
+
+      final timeUsed = DateTime.now().difference(_currentSession!.startTime).inSeconds;
+      
+      final stat = GameStat(
+        date: DateTime.now(),
+        mode: _currentSession!.mode,
+        score: _currentSession!.currentScore,
+        movesUsed: _currentSession!.currentMoves,
+        timeUsed: timeUsed,
+        won: won,
+      );
+
+      // Save to Firebase in real-time
+      await _firebaseService.saveGameResult(userId, stat);
+      print('Game result saved successfully to Firebase');
+    } catch (e) {
+      print('Error saving game result: $e');
+    }
+  }
+
+  /// Stream user stats from Firebase in real-time
+  Stream<Map<String, dynamic>?> watchUserStats() {
+    final userId = _firebaseService.getCurrentUserId();
+    if (userId == null) return const Stream.empty();
+    
+    return _firebaseService.watchUserStats(userId).map((snapshot) {
+      if (snapshot.exists) {
+        return snapshot.data() as Map<String, dynamic>;
+      }
+      return null;
+    });
+  }
+
+  /// Stream game history from Firebase in real-time
+  Stream<List<GameStat>> watchGameHistory() {
+    final userId = _firebaseService.getCurrentUserId();
+    if (userId == null) return const Stream.empty();
+    
+    return _firebaseService.watchGameHistory(userId).map((snapshot) {
+      return snapshot.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return GameStat(
+              date: (data['date'] as dynamic)?.toDate() ?? DateTime.now(),
+              mode: _parseGameMode(data['mode']),
+              score: data['score'] ?? 0,
+              movesUsed: data['movesUsed'] ?? 0,
+              timeUsed: data['timeUsed'] ?? 0,
+              won: data['won'] ?? false,
+            );
+          })
+          .toList();
+    });
+  }
+
+  GameMode _parseGameMode(String? modeString) {
+    if (modeString == null) return GameMode.standard;
+    if (modeString.contains('quick')) return GameMode.quick;
+    if (modeString.contains('competitive')) return GameMode.competitive;
+    return GameMode.standard;
   }
 }
 

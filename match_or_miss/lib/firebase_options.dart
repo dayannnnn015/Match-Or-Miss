@@ -6,9 +6,9 @@ class DefaultFirebaseOptions {
     // Replace with your actual Firebase configuration
     return const FirebaseOptions(
       apiKey: 'YOUR_API_KEY',
-      appId: 'YOUR_APP_ID',
-      messagingSenderId: 'YOUR_SENDER_ID',
-      projectId: 'YOUR_PROJECT_ID',
+      appId: '1:269061882766:android:709e496ab6a357e59cdadf',
+      messagingSenderId: '269061882766',
+      projectId: 'match-or-miss-game',
       authDomain: 'YOUR_AUTH_DOMAIN',
       databaseURL: 'YOUR_DATABASE_URL',
       storageBucket: 'YOUR_STORAGE_BUCKET',

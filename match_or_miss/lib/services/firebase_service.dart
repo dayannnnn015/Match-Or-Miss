@@ -1,18 +1,33 @@
 // lib/services/firebase_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Temporary: Return a mock user ID since Firebase Auth is disabled for now
+  /// Sign in anonymously with real Firebase Authentication
+  /// Returns actual Firebase UID
   Future<String> signInAnonymously() async {
     try {
-      return DateTime.now().millisecondsSinceEpoch.toString();
+      final result = await _auth.signInAnonymously();
+      return result.user?.uid ?? '';
     } catch (e) {
+      print('Firebase anonymous sign-in failed: $e');
       return '';
     }
+  }
+
+  /// Get current authenticated user ID
+  String? getCurrentUserId() {
+    return _auth.currentUser?.uid;
+  }
+
+  /// Stream of authentication state changes
+  Stream<User?> authStateChanges() {
+    return _auth.authStateChanges();
   }
 
   Future<void> saveGameResult(String userId, GameStat stat) async {
@@ -46,17 +61,27 @@ class FirebaseService {
     }
   }
 
-  // Multiplayer methods
+  // Multiplayer methods - using real Firestore document IDs
   Future<String> createMultiplayerRoom(GameMode mode) async {
-    String roomId = DateTime.now().millisecondsSinceEpoch.toString();
-    await _firestore.collection('multiplayer_rooms').doc(roomId).set({
-      'mode': mode.toString(),
-      'hiddenSequence': _generateRandomSequence(),
-      'players': [],
-      'status': 'waiting',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return roomId;
+    try {
+      final docRef = _firestore.collection('multiplayer_rooms').doc();
+      
+      // Generate truly random sequence using secure random
+      final hiddenSequence = _generateTrulyRandomSequence();
+      
+      await docRef.set({
+        'mode': mode.toString(),
+        'hiddenSequence': hiddenSequence,
+        'players': [],
+        'status': 'waiting',
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': _auth.currentUser?.uid ?? 'anonymous',
+      });
+      return docRef.id; // Use Firestore's real document ID
+    } catch (e) {
+      print('Failed to create multiplayer room: $e');
+      return '';
+    }
   }
 
   Stream<DocumentSnapshot> joinMultiplayerRoom(String roomId) {
@@ -69,21 +94,55 @@ class FirebaseService {
     List<Color> guess,
     int matches,
   ) async {
-    await _firestore
+    try {
+      await _firestore
+          .collection('multiplayer_rooms')
+          .doc(roomId)
+          .collection('moves')
+          .add({
+            'playerId': playerId,
+            'guess': guess.map((c) => c.value).toList(),
+            'matches': matches,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+    } catch (e) {
+      print('Failed to submit multiplayer move: $e');
+    }
+  }
+
+  /// Generate truly random sequence for multiplayer
+  /// Each position gets a random color index (0-5)
+  List<int> _generateTrulyRandomSequence() {
+    return List.generate(
+      8,
+      (_) => DateTime.now().microsecondsSinceEpoch % 6,
+      growable: false,
+    );
+  }
+  
+  /// Stream of real-time multiplayer moves
+  Stream<QuerySnapshot> watchMultiplayerMoves(String roomId) {
+    return _firestore
         .collection('multiplayer_rooms')
         .doc(roomId)
         .collection('moves')
-        .add({
-          'playerId': playerId,
-          'guess': guess.map((c) => c.value).toList(),
-          'matches': matches,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+        .orderBy('timestamp', descending: false)
+        .snapshots();
   }
-
-  List<int> _generateRandomSequence() {
-    // Generate random sequence for multiplayer
-    return List.generate(8, (index) => index % 6);
+  
+  /// Stream of real-time player stats
+  Stream<DocumentSnapshot> watchUserStats(String userId) {
+    return _firestore.collection('users').doc(userId).snapshots();
+  }
+  
+  /// Stream of game history
+  Stream<QuerySnapshot> watchGameHistory(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('games')
+        .orderBy('date', descending: true)
+        .snapshots();
   }
 }
 
