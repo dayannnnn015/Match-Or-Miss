@@ -17,75 +17,55 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   String? savedKey;
-  ai_svc.AIProvider savedProvider = ai_svc.AIProvider.openAI;
+  ai_svc.AIProvider savedProvider = ai_svc.AIProvider.grok;
 
-  if (kIsWeb) {
-    final prefs = await SharedPreferences.getInstance();
-    savedKey = prefs.getString('openai_api_key');
-    if (savedKey != null && savedKey.isNotEmpty) {
-      savedProvider = ai_svc.AIProvider.openAI;
-    } else {
-      savedKey = prefs.getString('gemini_api_key');
-      if (savedKey != null && savedKey.isNotEmpty) {
-        savedProvider = ai_svc.AIProvider.googleGemini;
-      }
-    }
-  } else {
-    savedKey = await SecureStorageService.getAPIKey('openai');
-    if (savedKey != null && savedKey.isNotEmpty) {
-      savedProvider = ai_svc.AIProvider.openAI;
-    } else {
-      savedKey = await SecureStorageService.getAPIKey('gemini');
-      if (savedKey != null && savedKey.isNotEmpty) {
-        savedProvider = ai_svc.AIProvider.googleGemini;
-      }
-    }
+  // Priority 1: env.json build-time keys (most reliable — always use these first)
+  const grokBuildKey   = String.fromEnvironment('GROK_API_KEY',   defaultValue: '');
+  const geminiBuiltKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+  const openAIBuiltKey = String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
 
-    if (savedKey == null || savedKey.isEmpty) {
+  if (grokBuildKey.isNotEmpty) {
+    savedKey = grokBuildKey;
+    savedProvider = ai_svc.AIProvider.grok;
+  } else if (geminiBuiltKey.isNotEmpty) {
+    savedKey = geminiBuiltKey;
+    savedProvider = ai_svc.AIProvider.googleGemini;
+  } else if (openAIBuiltKey.isNotEmpty) {
+    savedKey = openAIBuiltKey;
+    savedProvider = ai_svc.AIProvider.openAI;
+  }
+
+  // Priority 2: keys saved via in-app dialog (only used if no env.json key found)
+  if (savedKey == null || savedKey.isEmpty) {
+    if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      savedKey = prefs.getString('openai_api_key');
-      if (savedKey != null && savedKey.isNotEmpty) {
-        savedProvider = ai_svc.AIProvider.openAI;
-      } else {
-        savedKey = prefs.getString('gemini_api_key');
-        if (savedKey != null && savedKey.isNotEmpty) {
-          savedProvider = ai_svc.AIProvider.googleGemini;
-        }
+      final grokStored = prefs.getString('grok_api_key');
+      final geminiStored = prefs.getString('gemini_api_key');
+      final openaiStored = prefs.getString('openai_api_key');
+      if (grokStored != null && grokStored.isNotEmpty) {
+        savedKey = grokStored; savedProvider = ai_svc.AIProvider.grok;
+      } else if (geminiStored != null && geminiStored.isNotEmpty) {
+        savedKey = geminiStored; savedProvider = ai_svc.AIProvider.googleGemini;
+      } else if (openaiStored != null && openaiStored.isNotEmpty) {
+        savedKey = openaiStored; savedProvider = ai_svc.AIProvider.openAI;
+      }
+    } else {
+      final grokStored   = await SecureStorageService.getAPIKey('grok');
+      final geminiStored = await SecureStorageService.getAPIKey('gemini');
+      final openaiStored = await SecureStorageService.getAPIKey('openai');
+      if (grokStored != null && grokStored.isNotEmpty) {
+        savedKey = grokStored; savedProvider = ai_svc.AIProvider.grok;
+      } else if (geminiStored != null && geminiStored.isNotEmpty) {
+        savedKey = geminiStored; savedProvider = ai_svc.AIProvider.googleGemini;
+      } else if (openaiStored != null && openaiStored.isNotEmpty) {
+        savedKey = openaiStored; savedProvider = ai_svc.AIProvider.openAI;
       }
     }
   }
 
-  if (savedKey == null || savedKey.isEmpty) {
-    const openAIBuildTimeKey = String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
-    if (openAIBuildTimeKey.isNotEmpty) {
-      savedKey = openAIBuildTimeKey;
-      savedProvider = ai_svc.AIProvider.openAI;
-      if (kIsWeb) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('openai_api_key', openAIBuildTimeKey);
-      } else {
-        await SecureStorageService.saveAPIKey('openai', openAIBuildTimeKey);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('openai_api_key', openAIBuildTimeKey);
-      }
-    }
-  }
-
-  if (savedKey == null || savedKey.isEmpty) {
-    const buildTimeKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-    if (buildTimeKey.isNotEmpty) {
-      savedKey = buildTimeKey;
-      savedProvider = ai_svc.AIProvider.googleGemini;
-      if (kIsWeb) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('gemini_api_key', buildTimeKey);
-      } else {
-        await SecureStorageService.saveAPIKey('gemini', buildTimeKey);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('gemini_api_key', buildTimeKey);
-      }
-    }
-  }
+  print(savedKey != null && savedKey.isNotEmpty
+      ? '🤖 AI ready — provider: ${savedProvider.name}'
+      : '⚠️ No AI key found — local fallback active');
 
   runApp(MyApp(initialApiKey: savedKey ?? '', initialProvider: savedProvider));
 }
