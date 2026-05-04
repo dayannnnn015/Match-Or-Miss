@@ -1009,7 +1009,7 @@ class _GameScreenWithAIState extends State<GameScreenWithAI>
           ),
           const SizedBox(width: 8),
           const Text(
-            'NEBULA CODE',
+            'Match Or Miss',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,

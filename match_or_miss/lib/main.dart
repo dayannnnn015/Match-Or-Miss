@@ -132,7 +132,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AIProvider()),
       ],
       child: MaterialApp(
-        title: 'NEBULA CODE',
+        title: 'Match Or Miss',
         theme: ThemeData(
           brightness: Brightness.dark,
           useMaterial3: true,

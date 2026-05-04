@@ -184,10 +184,10 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     child: FadeTransition(
                       opacity: _logoFade,
-                      child: const Column(
+                          child: const Column(
                         children: [
                           Text(
-                            'NEBULA CODE',
+                            'Match Or Miss',
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
