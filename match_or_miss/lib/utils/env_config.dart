@@ -4,6 +4,7 @@ class EnvConfig {
   static const String openAIKey = String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
   static const String anthropicKey = String.fromEnvironment('ANTHROPIC_API_KEY', defaultValue: '');
   static const String geminiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+  static const String grokKey    = String.fromEnvironment('GROK_API_KEY',   defaultValue: '');
   
   // API endpoints
   static const String openAIEndpoint = 'https://api.openai.com/v1/chat/completions';

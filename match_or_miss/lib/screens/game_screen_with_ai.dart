@@ -120,7 +120,11 @@ class _GameScreenWithAIState extends State<GameScreenWithAI>
               _gameFinished = true;
               _resultShown = true;
               _celebrationController.forward();
-              _showResultDialog(gameProvider, won: true);
+              // Small delay so loadPostGameInsight() sets initial local feedback
+              // before _ResultDialogState.initState() captures it
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (mounted) _showResultDialog(gameProvider, won: true);
+              });
             }
           });
 
@@ -813,170 +817,19 @@ class _GameScreenWithAIState extends State<GameScreenWithAI>
   // ==========================================================================
 
   void _showResultDialog(GameProvider gp, {required bool won}) {
-    final parentContext = context;
     final hiddenSequence = gp.currentSession?.hiddenSequence ?? const <Bottle>[];
     final sequenceLength = hiddenSequence.length;
     final isSprintMode = gp.currentSession?.mode == GameMode.quick;
-    final feedback = isSprintMode && won
-        ? '🎉 Amazing! You solved a $sequenceLength-bottle sequence!\n\nNext challenge will be ${sequenceLength + 1} bottles!'
-        : gp.postGameInsight;
 
     showDialog(
-      context: parentContext,
+      context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-        title: Row(
-          children: [
-            Icon(
-              won ? Icons.emoji_events : Icons.sentiment_dissatisfied,
-              color: won ? const Color(0xFFFFB347) : const Color(0xFFFF6584),
-              size: 32,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              won ? 'VICTORY!' : 'DEFEAT',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (hiddenSequence.isNotEmpty) ...[
-                const Text(
-                  'TARGET SEQUENCE',
-                  style: TextStyle(
-                    color: Color(0xFF6C63FF),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: List.generate(hiddenSequence.length, (index) {
-                      final bottle = hiddenSequence[index];
-                      return Container(
-                        width: 48,
-                        height: 52,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: bottle.color,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: bottle.color.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.local_drink, size: 22, color: Colors.white),
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F0F1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF2D2D44)),
-                ),
-                child: Text(
-                  feedback,
-                  style: const TextStyle(
-                    color: Color(0xFFB0B0C0),
-                    height: 1.4,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              if (gp.isLoadingInsight)
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        'ANALYZING PERFORMANCE...',
-                        style: TextStyle(
-                          color: Color(0xFF6C63FF),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              final provider = parentContext.read<GameProvider>();
-              final nextMode = provider.currentSession?.mode ?? GameMode.standard;
-              Navigator.pop(dialogContext);
-              provider.initializeGame(nextMode);
-              _gameFinished = false;
-              _resultShown = false;
-              _hasPlayerMoved = false;
-              _lastMatchCount = 0;
-              _celebrationController.reset();
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF00D2FF)]),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: const Text(
-                'NEXT RUN',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              Navigator.pop(parentContext);
-            },
-            child: const Text(
-              'EXIT LAB',
-              style: TextStyle(
-                color: Color(0xFF4A4A5A),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+      builder: (_) => _ResultDialog(
+        gp: gp,
+        won: won,
+        hiddenSequence: hiddenSequence,
+        sequenceLength: sequenceLength,
+        isSprintMode: isSprintMode,
       ),
     );
   }
@@ -1009,7 +862,7 @@ class _GameScreenWithAIState extends State<GameScreenWithAI>
           ),
           const SizedBox(width: 8),
           const Text(
-            'NEBULA CODE',
+            'Match Or Miss',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -1097,6 +950,210 @@ class _GameScreenWithAIState extends State<GameScreenWithAI>
           ),
         ],
       ),
+    );
+  }
+}
+// ─── Result Dialog ────────────────────────────────────────────────────────────
+// StatefulWidget that manually listens to GameProvider so it always
+// rebuilds when AI feedback arrives — works reliably on Flutter Web.
+
+class _ResultDialog extends StatefulWidget {
+  final GameProvider gp;
+  final bool won;
+  final List<Bottle> hiddenSequence;
+  final int sequenceLength;
+  final bool isSprintMode;
+
+  const _ResultDialog({
+    required this.gp,
+    required this.won,
+    required this.hiddenSequence,
+    required this.sequenceLength,
+    required this.isSprintMode,
+  });
+
+  @override
+  State<_ResultDialog> createState() => _ResultDialogState();
+}
+
+class _ResultDialogState extends State<_ResultDialog> {
+  @override
+  void initState() {
+    super.initState();
+    widget.gp.addListener(_onUpdate);
+  }
+
+  @override
+  void dispose() {
+    widget.gp.removeListener(_onUpdate);
+    super.dispose();
+  }
+
+  void _onUpdate() {
+    if (!mounted) return;
+    setState(() {
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final insight = widget.gp.postGameInsight;
+    final loading = widget.gp.isLoadingInsight;
+    final feedback = widget.isSprintMode && widget.won
+        ? '🎉 Amazing! You solved a ${widget.sequenceLength}-bottle sequence!\n\nNext challenge will be ${widget.sequenceLength + 1} bottles!'
+        : insight.isEmpty || loading
+            ? '🔄 Analyzing your performance...'
+            : insight;
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+      title: Row(
+        children: [
+          Icon(
+            widget.won ? Icons.emoji_events : Icons.sentiment_dissatisfied,
+            color: widget.won ? const Color(0xFFFFB347) : const Color(0xFFFF6584),
+            size: 32,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            widget.won ? 'VICTORY!' : 'DEFEAT',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.hiddenSequence.isNotEmpty) ...[
+              const Text(
+                'TARGET SEQUENCE',
+                style: TextStyle(
+                  color: Color(0xFF6C63FF),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(widget.hiddenSequence.length, (i) {
+                    final bottle = widget.hiddenSequence[i];
+                    return Container(
+                      width: 48,
+                      height: 52,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: bottle.color,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: bottle.color.withValues(alpha: 0.4),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.local_drink, size: 22, color: Colors.white),
+                    );
+                  }),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: Container(
+                key: ValueKey(feedback),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0F1A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF2D2D44)),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      feedback,
+                      style: const TextStyle(
+                        color: Color(0xFFB0B0C0),
+                        height: 1.4,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'ANALYZING PERFORMANCE...',
+                      style: TextStyle(
+                        color: Color(0xFF6C63FF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            widget.gp.resetGame();
+          },
+          child: const Text(
+            'EXIT LAB',
+            style: TextStyle(color: Color(0xFF4A4A5A), fontWeight: FontWeight.w600),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            widget.gp.resetGame();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C63FF),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          child: const Text(
+            'NEXT RUN',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
