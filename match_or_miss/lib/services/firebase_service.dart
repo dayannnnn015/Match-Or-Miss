@@ -1,12 +1,36 @@
 // lib/services/firebase_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
 
+class User {
+  final String uid;
+
+  User(this.uid);
+}
+
+class _UserCredential {
+  final User? user;
+
+  _UserCredential(this.user);
+}
+
+class _AuthStub {
+  User? currentUser;
+
+  Future<_UserCredential> signInAnonymously() async {
+    currentUser = User(DateTime.now().microsecondsSinceEpoch.toString());
+    return _UserCredential(currentUser);
+  }
+
+  Stream<User?> authStateChanges() async* {
+    yield currentUser;
+  }
+}
+
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final _AuthStub _auth = _AuthStub();
 
   /// Sign in anonymously with real Firebase Authentication
   /// Returns actual Firebase UID

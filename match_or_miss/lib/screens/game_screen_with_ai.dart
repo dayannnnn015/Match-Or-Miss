@@ -1137,7 +1137,12 @@ class _ResultDialogState extends State<_ResultDialog> {
         ElevatedButton(
           onPressed: () {
             Navigator.of(context).pop();
-            widget.gp.resetGame();
+            // If this dialog is shown for sprint mode, immediately start the next sprint round
+            if (widget.isSprintMode) {
+              widget.gp.initializeGame(GameMode.quick);
+            } else {
+              widget.gp.resetGame();
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF6C63FF),

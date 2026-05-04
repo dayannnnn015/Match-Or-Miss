@@ -238,6 +238,43 @@ class GameProvider extends ChangeNotifier {
         mode: _currentSession!.mode,
       );
       _currentSession!.currentScore += score;
+
+      // If sprint (quick) mode — immediately start next round with incremented
+      // sequence length. Skip AI analysis/loading and do a seamless transition.
+      if (_currentSession!.mode == GameMode.quick) {
+        // Record performance for adaptation and update sequence length
+        _recordFinishedQuickRound();
+        _adaptQuickSequenceLength();
+
+        // Prepare next quick round without showing dialogs or loading
+        final nextLength = _quickSequenceLength;
+        final hidden = _gameService.generateHiddenSequence(length: nextLength);
+        final shuffledBottles = _gameService.generateAvailableBottles(hidden);
+
+        // Create a fresh session while preserving cumulative score
+        _currentSession = GameSession(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          mode: GameMode.quick,
+          timeLimit: _getTimeLimit(GameMode.quick),
+          maxMoves: _getMaxMoves(GameMode.quick),
+          startTime: DateTime.now(),
+          hiddenSequence: hidden,
+          currentGuessSlots: shuffledBottles.cast<Bottle?>(),
+          availableBottles: [],
+          currentScore: _currentSession!.currentScore,
+        );
+
+        _currentGuessSlots = shuffledBottles.cast<Bottle?>();
+        _previousGuessSlots = shuffledBottles.cast<Bottle?>();
+        _isSubmitting = false;
+        _resultDialogShown = false; // allow future checks
+        _postGameInsight = '';
+        _isLoadingInsight = false;
+        notifyListeners();
+        return;
+      }
+
+      // Non-sprint modes use post-game analysis flow
       loadPostGameInsight();
     }
   }
